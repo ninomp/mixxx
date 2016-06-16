@@ -30,7 +30,7 @@ bool TraktorTrackModel::isColumnHiddenByDefault(int column) {
     if (column == fieldIndex(ColumnCache::COLUMN_LIBRARYTABLE_BITRATE)) {
         return true;
     }
-    return false;
+    return BaseSqlTableModel::isColumnHiddenByDefault(column);
 }
 
 TraktorPlaylistModel::TraktorPlaylistModel(QObject* parent,
@@ -47,7 +47,7 @@ bool TraktorPlaylistModel::isColumnHiddenByDefault(int column) {
     if (column == fieldIndex(ColumnCache::COLUMN_LIBRARYTABLE_BITRATE)) {
         return true;
     }
-    return false;
+    return BaseSqlTableModel::isColumnHiddenByDefault(column);
 }
 
 TraktorFeature::TraktorFeature(QObject* parent, TrackCollection* pTrackCollection)
@@ -72,8 +72,16 @@ TraktorFeature::TraktorFeature(QObject* parent, TrackCollection* pTrackCollectio
             << "bpm"
             << "key";
     m_trackSource = QSharedPointer<BaseTrackCache>(
-        new BaseTrackCache(m_pTrackCollection, tableName, idColumn,
+            new BaseTrackCache(m_pTrackCollection, tableName, idColumn,
                            columns, false));
+    QStringList searchColumns;
+    searchColumns << "artist"
+                  << "album"
+                  << "location"
+                  << "comment"
+                  << "title"
+                  << "genre";
+    m_trackSource->setSearchColumns(searchColumns);
 
     m_isActivated = false;
     m_pTraktorTableModel = new TraktorTrackModel(this, m_pTrackCollection, m_trackSource);
@@ -150,6 +158,7 @@ void TraktorFeature::activate() {
     }
 
     emit(showTrackModel(m_pTraktorTableModel));
+    emit(enableCoverArtDisplay(false));
 }
 
 void TraktorFeature::activateChild(const QModelIndex& index) {
@@ -163,6 +172,7 @@ void TraktorFeature::activateChild(const QModelIndex& index) {
         qDebug() << "Activate Traktor Playlist: " << item->dataPath().toString();
         m_pTraktorPlaylistModel->setPlaylist(item->dataPath().toString());
         emit(showTrackModel(m_pTraktorPlaylistModel));
+        emit(enableCoverArtDisplay(false));
     }
 }
 
@@ -206,7 +216,7 @@ TreeItem* TraktorFeature::importLibrary(QString file) {
                 inCollectionTag = true;
             }
             // Each "ENTRY" tag in <COLLECTION> represents a track
-            if (inCollectionTag && xml.name() == "ENTRY" ) {
+            if (inCollectionTag && xml.name() == "ENTRY") {
                 //parse track
                 parseTrack(xml, query);
                 ++nAudioFiles; //increment number of files in the music collection

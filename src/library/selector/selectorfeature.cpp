@@ -3,20 +3,20 @@
 
 #include <QtDebug>
 
-#include "dlgselector.h"
+#include "library/dlgselector.h"
 #include "library/selector/selectorfeature.h"
 #include "library/librarytablemodel.h"
 #include "library/trackcollection.h"
-#include "mixxxkeyboard.h"
-#include "soundsourceproxy.h"
+#include "controllers/keyboard/keyboardeventfilter.h"
+#include "sources/soundsourceproxy.h"
 #include "widget/wlibrary.h"
 #include "widget/wlibrarysidebar.h"
 
 const QString SelectorFeature::m_sSelectorViewName = QString("Selector");
 
 SelectorFeature::SelectorFeature(QObject* parent,
-                               ConfigObject<ConfigValue>* pConfig,
-                               TrackCollection* pTrackCollection)
+                                 UserSettingsPointer pConfig,
+                                 TrackCollection* pTrackCollection)
         : LibraryFeature(parent),
           m_pConfig(pConfig),
           m_pTrackCollection(pTrackCollection),
@@ -35,7 +35,7 @@ QIcon SelectorFeature::getIcon() {
 }
 
 void SelectorFeature::bindWidget(WLibrary* libraryWidget,
-                                 MixxxKeyboard* keyboard) {
+                                 KeyboardEventFilter* keyboard) {
     m_pSelectorView = new DlgSelector(libraryWidget, m_pConfig,
         m_pTrackCollection, keyboard);
     libraryWidget->registerView(m_sSelectorViewName, m_pSelectorView);
@@ -53,6 +53,8 @@ TreeItemModel* SelectorFeature::getChildModel() {
 void SelectorFeature::activate() {
     //qDebug() << "SelectorFeature::activate()";
     emit(switchToView(m_sSelectorViewName));
+    emit(restoreSearch(QString()));
+    emit(enableCoverArtDisplay(true));
 }
 
 void SelectorFeature::setSeedTrack(TrackPointer pTrack) {
@@ -74,20 +76,20 @@ bool SelectorFeature::dropAccept(QList<QUrl> urls, QWidget *pSource) {
     QList<QFileInfo> files;
     foreach (QUrl url, urls) {
         QFileInfo file = url.toLocalFile();
-        if (SoundSourceProxy::isFilenameSupported(file.fileName())) {
+        if (SoundSourceProxy::isFileNameSupported(file.fileName())) {
             files.append(file);
         }
     }
 
-    QList<int> trackIds;
+    QList<TrackId> trackIds;
     if (pSource) {
         trackIds = m_pTrackCollection->getTrackDAO().getTrackIds(files);
     } else {
-        trackIds = trackDao.addTracks(files, true);
+        trackIds = trackDao.addMultipleTracks(files, true);
     }
 
     // qDebug() << "Track ID: " << trackIds.first();
-    if (trackIds.first() > 0) {
+    if (trackIds.first().isValid()) {
         m_pSelectorView->setSeedTrack(trackDao.getTrack(trackIds.first()));
     }
     return true;
@@ -95,5 +97,5 @@ bool SelectorFeature::dropAccept(QList<QUrl> urls, QWidget *pSource) {
 
 bool SelectorFeature::dragMoveAccept(QUrl url) {
     QFileInfo file(url.toLocalFile());
-    return SoundSourceProxy::isFilenameSupported(file.fileName());
+    return SoundSourceProxy::isFileNameSupported(file.fileName());
 }

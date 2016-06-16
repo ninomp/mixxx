@@ -5,7 +5,7 @@
 #include <QScopedPointer>
 
 #include "mixxxtest.h"
-#include "controlobject.h"
+#include "control/controlobject.h"
 #include "effects/effectchain.h"
 #include "effects/effectchainslot.h"
 #include "effects/effectsmanager.h"
@@ -18,11 +18,17 @@ using ::testing::_;
 
 class EffectSlotTest : public BaseEffectTest {
   protected:
-    virtual void SetUp() {
-        m_pEffectsManager->registerGroup("[Master]");
-        m_pEffectsManager->registerGroup("[Headphone]");
+    EffectSlotTest()
+            : m_master(m_factory.getOrCreateHandle("[Master]"), "[Master]"),
+              m_headphone(m_factory.getOrCreateHandle("[Headphone]"), "[Headphone]") {
+        m_pEffectsManager->registerChannel(m_master);
+        m_pEffectsManager->registerChannel(m_headphone);
         registerTestBackend();
     }
+
+    ChannelHandleFactory m_factory;
+    ChannelHandleAndGroup m_master;
+    ChannelHandleAndGroup m_headphone;
 };
 
 TEST_F(EffectSlotTest, ControlsReflectSlotState) {
@@ -32,21 +38,21 @@ TEST_F(EffectSlotTest, ControlsReflectSlotState) {
     int iChainNumber = 0;
     int iEffectNumber = 0;
 
-    EffectRackPointer pRack = m_pEffectsManager->addEffectRack();
+    StandardEffectRackPointer pRack = m_pEffectsManager->addStandardEffectRack();
     EffectChainSlotPointer pChainSlot = pRack->addEffectChainSlot();
-    // EffectRack::addEffectChainSlot automatically adds 4 effect slots. In the
-    // future we will probably remove this so this will just start segfaulting.
+    // StandardEffectRack::addEffectChainSlot automatically adds 4 effect
+    // slots. In the future we will probably remove this so this will just start
+    // segfaulting.
     EffectSlotPointer pEffectSlot = pChainSlot->getEffectSlot(0);
 
-    QString group = EffectSlot::formatGroupString(iRackNumber,
-                                                  iChainNumber,
-                                                  iEffectNumber);
+    QString group = StandardEffectRack::formatEffectSlotGroupString(
+        iRackNumber, iChainNumber, iEffectNumber);
 
     EffectManifest manifest;
     manifest.setId("org.mixxx.test.effect");
     manifest.setName("Test Effect");
     manifest.addParameter();
-    registerTestEffect(manifest);
+    registerTestEffect(manifest, false);
 
     // Check the controls reflect the state of their loaded effect.
     EffectPointer pEffect = m_pEffectsManager->instantiateEffect(manifest.id());

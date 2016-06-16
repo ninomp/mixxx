@@ -1,7 +1,7 @@
 #include <QStringList>
 #include <QStringBuilder>
 
-#include "trackinfoobject.h"
+#include "track/track.h"
 #include "track/timbre.h"
 #include "track/keyutils.h"
 
@@ -14,7 +14,7 @@ using mixxx::track::io::key::ChromaticKey_IsValid;
 
 
 SelectorFilters::SelectorFilters(QObject* pParent,
-                                 ConfigObject<ConfigValue>* pConfig)
+                                 UserSettingsPointer pConfig)
         : QObject(pParent),
         m_pConfig(pConfig) {
     loadStoredFilterSettings();

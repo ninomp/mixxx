@@ -5,7 +5,7 @@
 #include "waveform/waveformwidgetfactory.h"
 
 #include "widget/wskincolor.h"
-#include "trackinfoobject.h"
+#include "track/track.h"
 #include "widget/wwidget.h"
 #include "util/math.h"
 
@@ -28,8 +28,8 @@ void WaveformRendererHSV::draw(QPainter* painter,
         return;
     }
 
-    const Waveform* waveform = trackInfo->getWaveform();
-    if (waveform == NULL) {
+    ConstWaveformPointer waveform = trackInfo->getWaveform();
+    if (waveform.isNull()) {
         return;
     }
 

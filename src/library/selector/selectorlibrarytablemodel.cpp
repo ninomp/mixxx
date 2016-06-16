@@ -5,13 +5,13 @@
 
 #include "library/queryutil.h"
 #include "library/trackcollection.h"
-#include "basetrackplayer.h"
-#include "playerinfo.h"
+#include "mixer/basetrackplayer.h"
+#include "mixer/playerinfo.h"
 
-#include "controlobjectthread.h"
-#include "controlobject.h"
-#include "trackinfoobject.h"
+#include "control/controlobject.h"
+#include "control/controlproxy.h"
 
+#include "track/track.h"
 #include "track/keyutils.h"
 #include "track/timbreutils.h"
 
@@ -25,7 +25,7 @@ using mixxx::track::io::key::ChromaticKey;
 using mixxx::track::io::key::ChromaticKey_IsValid;
 
 SelectorLibraryTableModel::SelectorLibraryTableModel(QObject* parent,
-            ConfigObject<ConfigValue>* pConfig,
+            UserSettingsPointer pConfig,
             TrackCollection* pTrackCollection)
         : LibraryTableModel(parent, pTrackCollection,
                 "mixxx.db.model.selector"),
@@ -127,9 +127,9 @@ void SelectorLibraryTableModel::calculateSimilarity() {
     if (!m_pSeedTrack.isNull()) {
         // qDebug() << m_selectorSimilarity.getTopFollowupTrack(m_pSeedTrack->getId());
 
-        QList<int> trackIds;
+        QList<TrackId> trackIds;
         for (int i = 0, n = rowCount(); i < n; i++) {
-            trackIds << index(i, fieldIndex(LIBRARYTABLE_ID)).data().toInt();
+            trackIds << TrackId(index(i, fieldIndex(LIBRARYTABLE_ID)).data());
         }
 
         QList<SelectorSimilarity::ScorePair> results =
@@ -139,7 +139,7 @@ void SelectorLibraryTableModel::calculateSimilarity() {
         QVariantList queryTrackIds;
         QVariantList queryScores;
         foreach (SelectorSimilarity::ScorePair pair, results) {
-            queryTrackIds << pair.trackId;
+            queryTrackIds << pair.trackId.toVariant();
             queryScores << pair.score;
         }
 
@@ -175,10 +175,10 @@ void SelectorLibraryTableModel::calculateAllSimilarities(
 
     for (int i = 0; i < rowCount(); i++) {
         TrackPointer pTrack_i = getTrack(index(i, fieldIndex(LIBRARYTABLE_ID)));
-        QString sTrack_i = pTrack_i->getFilename();
+        QString sTrack_i = pTrack_i->getFileName();
         for (int j = i + 1; j < rowCount(); j++) {
             TrackPointer pTrack_j = getTrack(index(j, fieldIndex(LIBRARYTABLE_ID)));
-            QString sTrack_j = pTrack_j->getFilename();
+            QString sTrack_j = pTrack_j->getFileName();
             QHash<QString, double> comparison =
                     m_selectorSimilarity.compareTracks(pTrack_i, pTrack_j);
             QStringList scores;
@@ -219,8 +219,8 @@ void SelectorLibraryTableModel::slotPlayingDeckChanged(int deck) {
     }
 
     if (deck >= 0) {
-        m_channelBpm = new ControlObjectThread(m_pChannel, "bpm");
-        m_channelKey = new ControlObjectThread(m_pChannel, "key");
+        m_channelBpm = new ControlProxy(m_pChannel, "bpm");
+        m_channelKey = new ControlProxy(m_pChannel, "key");
         // listen for slider change events
         connect(m_channelBpm, SIGNAL(valueChanged(double)), this,
             SLOT(slotChannelBpmChanged(double)));

@@ -16,14 +16,14 @@
 #include <cstdio>
 
 #include "SimilarityPlugin.h"
-#include "../dsp/Pitch.h"
-#include "../dsp/MFCC.h"
-#include "../dsp/Chromagram.h"
-#include "../dsp/Decimator.h"
-#include "../dsp/BeatSpectrum.h"
-#include "../dsp/KLDivergence.h"
-#include "../dsp/CosineDistance.h"
-#include "../dsp/MathUtilities.h"
+#include "base/Pitch.h"
+#include "dsp/mfcc/MFCC.h"
+#include "dsp/chromagram/Chromagram.h"
+#include "dsp/rateconversion/Decimator.h"
+#include "dsp/rhythm/BeatSpectrum.h"
+#include "maths/KLDivergence.h"
+#include "maths/CosineDistance.h"
+#include "maths/MathUtilities.h"
 
 using std::string;
 using std::vector;
@@ -370,10 +370,10 @@ SimilarityPlugin::getOutputDescriptors() const
     combined.isQuantized = false;
     combined.sampleType = OutputDescriptor::FixedSampleRate;
     combined.sampleRate = 1;
-    
+
     m_combinedOutput = list.size();
     list.push_back(combined);
-    
+
     return list;
 }
 
@@ -965,7 +965,7 @@ SimilarityPlugin::getRemainingFeatures()
     std::vector<float> mean = returnFeatures[m_meansOutput][0].values;
     std::vector<float> variance = returnFeatures[m_variancesOutput][0].values;
     std::vector<float> beatSpectrum = returnFeatures[m_beatSpectraOutput][0].values;
-    
+
     for (std::vector<float>::iterator it = mean.begin(); it != mean.end(); ++it) {
         combinedFeature.values.push_back(*it);
     }

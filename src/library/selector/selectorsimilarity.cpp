@@ -4,13 +4,13 @@
 #include "library/selector/selector_preferences.h"
 #include "library/selector/selectorfilters.h"
 #include "library/selector/selectorsimilarity.h"
-#include "trackinfoobject.h"
+#include "track/track.h"
 #include "track/timbreutils.h"
 #include "util/timer.h"
 
 SelectorSimilarity::SelectorSimilarity(QObject* parent,
                                        TrackCollection* pTrackCollection,
-                                       ConfigObject<ConfigValue>* pConfig,
+                                       UserSettingsPointer pConfig,
                                        SelectorFilters& selectorFilters)
         : QObject(parent),
           m_pConfig(pConfig),
@@ -25,8 +25,8 @@ SelectorSimilarity::SelectorSimilarity(QObject* parent,
 SelectorSimilarity::~SelectorSimilarity() {
 }
 
-QList<SelectorSimilarity::ScorePair> SelectorSimilarity::calculateSimilarities(int iSeedTrackId,
-        QList<int> trackIds) {
+QList<SelectorSimilarity::ScorePair> SelectorSimilarity::calculateSimilarities(TrackId iSeedTrackId,
+        QList<TrackId> trackIds) {
     QTime timer;
     timer.start();
 
@@ -35,7 +35,7 @@ QList<SelectorSimilarity::ScorePair> SelectorSimilarity::calculateSimilarities(i
     TrackPointer pSeedTrack = m_trackDAO.getTrack(iSeedTrackId);
     QHash<QString, double> contributions = normalizeContributions(pSeedTrack);
 
-    foreach (int trackId, trackIds) {
+    foreach (TrackId trackId, trackIds) {
         double score = 0.0;
         TrackPointer pTrack = m_trackDAO.getTrack(trackId);
         foreach (QString key, contributions.keys()) {
@@ -74,8 +74,8 @@ QStringList SelectorSimilarity::getSimilarityTypes() {
 // Return up to n followup tracks for a given seed track, filtered and ranked
 // according to current settings in DlgPrefSelector.
 // (n defaults to -1, which returns all results.)
-QList<int> SelectorSimilarity::getFollowupTracks(int iSeedTrackId, int n) {
-    QList<int> results;
+QList<TrackId> SelectorSimilarity::getFollowupTracks(TrackId iSeedTrackId, int n) {
+    QList<TrackId> results;
     TrackPointer pSeedTrack = m_trackDAO.getTrack(iSeedTrackId);
     QString filterString = m_selectorFilters.getFilterString(pSeedTrack);
     QSqlQuery query(m_database);
@@ -83,12 +83,12 @@ QList<int> SelectorSimilarity::getFollowupTracks(int iSeedTrackId, int n) {
                   "mixxx_deleted=0 AND " % filterString);
     if (!query.exec()) {
         LOG_FAILED_QUERY(query);
-        return QList<int>();
+        return QList<TrackId>();
     }
 
-    QList<int> unrankedResults;
+    QList<TrackId> unrankedResults;
     while (query.next()) {
-        int trackId = query.value(0).toInt();
+        TrackId trackId = TrackId(query.value(0));
         if (trackId != iSeedTrackId) {
             unrankedResults << trackId;
         }
@@ -110,10 +110,10 @@ QList<int> SelectorSimilarity::getFollowupTracks(int iSeedTrackId, int n) {
     return results;
 }
 
-int SelectorSimilarity::getTopFollowupTrack(int iSeedTrackId) {
-    QList<int> results = getFollowupTracks(iSeedTrackId, 1);
+TrackId SelectorSimilarity::getTopFollowupTrack(TrackId iSeedTrackId) {
+    QList<TrackId> results = getFollowupTracks(iSeedTrackId, 1);
     if (results.isEmpty()) {
-        return -1; // invalid track Id
+        return TrackId(); // invalid track Id
     }
     // TODO (XXX): ensure that follow-up has not been played recently
     return results.first();

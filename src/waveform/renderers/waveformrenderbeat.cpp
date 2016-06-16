@@ -4,29 +4,19 @@
 
 #include "waveform/renderers/waveformrenderbeat.h"
 
-#include "controlobject.h"
-#include "controlobjectthread.h"
+#include "control/controlobject.h"
 #include "track/beats.h"
-#include "trackinfoobject.h"
+#include "track/track.h"
 #include "waveform/renderers/waveformwidgetrenderer.h"
 #include "widget/wskincolor.h"
 #include "widget/wwidget.h"
 
 WaveformRenderBeat::WaveformRenderBeat(WaveformWidgetRenderer* waveformWidgetRenderer)
-        : WaveformRendererAbstract(waveformWidgetRenderer),
-          m_pBeatActive(NULL) {
+        : WaveformRendererAbstract(waveformWidgetRenderer) {
     m_beats.resize(128);
 }
 
 WaveformRenderBeat::~WaveformRenderBeat() {
-    if (m_pBeatActive)
-        delete m_pBeatActive;
-}
-
-bool WaveformRenderBeat::init() {
-    m_pBeatActive = new ControlObjectThread(
-            m_waveformRenderer->getGroup(), "beat_active");
-    return m_pBeatActive->valid();
 }
 
 void WaveformRenderBeat::setup(const QDomNode& node, const SkinContext& context) {
@@ -59,8 +49,8 @@ void WaveformRenderBeat::draw(QPainter* painter, QPaintEvent* /*event*/) {
     //          << "firstDisplayedPosition" << firstDisplayedPosition
     //          << "lastDisplayedPosition" << lastDisplayedPosition;
 
-    QScopedPointer<BeatIterator> it(trackBeats->findBeats(
-        firstDisplayedPosition * trackSamples, lastDisplayedPosition * trackSamples));
+    std::unique_ptr<BeatIterator> it(trackBeats->findBeats(
+            firstDisplayedPosition * trackSamples, lastDisplayedPosition * trackSamples));
 
     // if no beat do not waste time saving/restoring painter
     if (!it || !it->hasNext()) {
@@ -83,7 +73,7 @@ void WaveformRenderBeat::draw(QPainter* painter, QPaintEvent* /*event*/) {
         double xBeatPoint = m_waveformRenderer->transformSampleIndexInRendererWorld(beatPosition);
 
         xBeatPoint = qRound(xBeatPoint);
-        
+
         // If we don't have enough space, double the size.
         if (beatCount >= m_beats.size()) {
             m_beats.resize(m_beats.size() * 2);

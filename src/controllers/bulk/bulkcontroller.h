@@ -13,6 +13,7 @@
 #include "controllers/controller.h"
 #include "controllers/hid/hidcontrollerpreset.h"
 #include "controllers/hid/hidcontrollerpresetfilehandler.h"
+#include "util/duration.h"
 
 struct libusb_device_handle;
 struct libusb_context;
@@ -27,7 +28,7 @@ class BulkReader : public QThread {
     void stop();
 
   signals:
-    void incomingData(QByteArray data);
+    void incomingData(QByteArray data, mixxx::Duration timestamp);
 
   protected:
     void run();
@@ -69,7 +70,7 @@ class BulkController : public Controller {
     }
 
     virtual bool matchPreset(const PresetInfo& preset);
-    virtual bool matchProductInfo(QHash <QString,QString >);
+    virtual bool matchProductInfo(const ProductInfo& product);
 
   protected:
     Q_INVOKABLE void send(QList<int> data, unsigned int length);

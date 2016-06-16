@@ -4,13 +4,15 @@
 #ifndef ENGINEMICROPHONE_H
 #define ENGINEMICROPHONE_H
 
-#include "controlobjectslave.h"
-#include "controlpushbutton.h"
+#include <QScopedPointer>
+
+#include "control/controlproxy.h"
+#include "control/controlpushbutton.h"
 #include "engine/enginechannel.h"
 #include "engine/enginevumeter.h"
 #include "util/circularbuffer.h"
 
-#include "soundmanagerutil.h"
+#include "soundio/soundmanagerutil.h"
 
 class EffectsManager;
 class EngineEffectsManager;
@@ -21,7 +23,8 @@ class ControlAudioTaperPot;
 class EngineMicrophone : public EngineChannel, public AudioDestination {
     Q_OBJECT
   public:
-    EngineMicrophone(const char* pGroup, EffectsManager* pEffectsManager);
+    EngineMicrophone(const ChannelHandleAndGroup& handle_group,
+                     EffectsManager* pEffectsManager);
     virtual ~EngineMicrophone();
 
     bool isActive();
@@ -49,12 +52,16 @@ class EngineMicrophone : public EngineChannel, public AudioDestination {
     bool isSolo();
     double getSoloDamping();
 
+  private slots:
+    // Reject all change requests for input configured.
+    void slotInputConfiguredChangeRequest(double) {}
+
   private:
     EngineEffectsManager* m_pEngineEffectsManager;
     EngineVuMeter m_vuMeter;
-    ControlObject* m_pEnabled;
+    QScopedPointer<ControlObject> m_pInputConfigured;
     ControlAudioTaperPot* m_pPregain;
-    ControlObjectSlave* m_pSampleRate;
+    ControlProxy* m_pSampleRate;
     const CSAMPLE* volatile m_sampleBuffer;
 
     bool m_wasActive;

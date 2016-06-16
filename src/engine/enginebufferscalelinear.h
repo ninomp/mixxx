@@ -33,39 +33,31 @@ const int kiLinearScaleReadAheadLength = 10240;
 class EngineBufferScaleLinear : public EngineBufferScale  {
   public:
     EngineBufferScaleLinear(ReadAheadManager *pReadAheadManager);
-    virtual ~EngineBufferScaleLinear();
+    ~EngineBufferScaleLinear() override;
 
-    CSAMPLE* getScaled(unsigned long buf_size);
-    void clear();
+    double getScaled(CSAMPLE* pOutput, const int iBufferSize) override;
+    void clear() override;
 
-    void setScaleParameters(int iSampleRate,
-                            double base_rate,
-                            bool speed_affects_pitch,
-                            double* speed_adjust,
-                            double* pitch_adjust);
+    void setScaleParameters(double base_rate,
+                            double* pTempoRatio,
+                             double* pPitchRatio) override;
 
   private:
-    CSAMPLE* do_scale(CSAMPLE* buf, unsigned long buf_size,
-                      int *samples_read);
+    int do_scale(CSAMPLE* buf, const int buf_size);
+    int do_copy(CSAMPLE* buf, const int buf_size);
 
-    /** Holds playback direction */
-    bool m_bBackwards;
     bool m_bClear;
     double m_dRate;
     double m_dOldRate;
 
-    /** Buffer for handling calls to ReadAheadManager */
-    CSAMPLE* buffer_int;
-    int buffer_int_size;
-    CSAMPLE m_fPrevSample[2];
+    // Buffer for handling calls to ReadAheadManager
+    CSAMPLE* m_bufferInt;
+    int m_bufferIntSize;
+    CSAMPLE m_floorSampleOld[2];
     // The read-ahead manager that we use to fetch samples
     ReadAheadManager* m_pReadAheadManager;
-    double m_dCurSampleIndex;
-    double m_dNextSampleIndex;
-
-    /*QFile df;
-    QTextStream writer;
-    int buffer_count;*/
+    double m_dCurrentFrame;
+    double m_dNextFrame;
 };
 
 #endif

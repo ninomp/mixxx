@@ -383,14 +383,47 @@ METADATA
       );
     </sql>
   </revision>
-   <revision version="24" min_compatible="3">
+  <revision version="24" min_compatible="3">
     <description>
-            Add timbre column
+      Add cover art support. Default source is UNKNOWN and default type is NONE.
+      See library/coverart.h.
     </description>
     <sql>
-      ALTER TABLE Library ADD COLUMN timbre BLOB;
-      ALTER TABLE Library ADD COLUMN timbre_version TEXT;
-      ALTER TABLE Library ADD COLUMN timbre_sub_version TEXT;
+      ALTER TABLE library ADD COLUMN coverart_source INTEGER DEFAULT 0;
+      ALTER TABLE library ADD COLUMN coverart_type INTEGER DEFAULT 0;
+      ALTER TABLE library ADD COLUMN coverart_location TEXT DEFAULT "";
+      ALTER TABLE library ADD COLUMN coverart_hash INTEGER DEFAULT 0;
     </sql>
   </revision>
+  <revision version="25" min_compatible="3">
+    <description>
+      Add full replay gain support including peak amplitude. The default
+      value for the peak amplitude is "undefined", represented by any
+      negative value. The internal constant for "undefined" is -1.0.
+    </description>
+    <sql>
+      ALTER TABLE library ADD COLUMN replaygain_peak REAL DEFAULT -1.0;
+    </sql>
+  </revision>
+  <revision version="26" min_compatible="3">
+    <description>
+      Add new column "tracktotal" column that stores the total number of
+      tracks as a string. The total number of tracks will be reloaded
+      from the corresponding file upon first access when encountering
+      the default value.
+    </description>
+    <sql>
+      ALTER TABLE library ADD COLUMN tracktotal TEXT DEFAULT '//';
+    </sql>
+  </revision>
+  <revision version="27" min_compatible="3">
+   <description>
+     Add timbre column
+   </description>
+   <sql>
+     ALTER TABLE Library ADD COLUMN timbre BLOB;
+     ALTER TABLE Library ADD COLUMN timbre_version TEXT;
+     ALTER TABLE Library ADD COLUMN timbre_sub_version TEXT;
+   </sql>
+ </revision>
 </schema>

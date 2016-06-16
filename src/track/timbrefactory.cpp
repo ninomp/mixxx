@@ -18,7 +18,7 @@ TimbrePointer TimbreFactory::loadTimbreFromByteArray(TrackPointer pTrack,
         qDebug() << "Successfully deserialized TimbreModel";
         return TimbrePointer(pTimbre, &TimbreFactory::deleteTimbre);
     }
-    qDebug() << "TimbreFactory::loadTimbreFromByteArray could not parse"
+    qDebug() << "TimbreFactory::loadTimbreFromByteArray could not parse "
                 "serialized timbre model.";
     return TimbrePointer();
 }
@@ -97,6 +97,7 @@ TimbrePointer TimbreFactory::makePreferredTimbreModel(TrackPointer pTrack,
         const int iSampleRate, const int iTotalSamples) {
     Q_UNUSED(pTrack);
     Q_UNUSED(iSampleRate);
+    Q_UNUSED(iTotalSamples);
     const QString version = getPreferredVersion();
     const QString subVersion = getPreferredSubVersion(extraVersionInfo);
 

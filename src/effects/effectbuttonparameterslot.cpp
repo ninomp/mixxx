@@ -1,39 +1,32 @@
 #include <QtDebug>
 
-#include "controleffectknob.h"
+#include "control/controleffectknob.h"
 #include "effects/effectbuttonparameterslot.h"
-#include "controlobject.h"
-#include "controlpushbutton.h"
+#include "control/controlobject.h"
+#include "control/controlpushbutton.h"
+#include "util/math.h"
 
-EffectButtonParameterSlot::EffectButtonParameterSlot(const unsigned int iRackNumber,
-                                         const unsigned int iChainNumber,
-                                         const unsigned int iSlotNumber,
-                                         const unsigned int iParameterNumber)
-        : EffectParameterSlotBase(iRackNumber, iChainNumber, iSlotNumber,
-                                  iParameterNumber) {
-    QString itemPrefix = formatItemPrefix(iParameterNumber);
+EffectButtonParameterSlot::EffectButtonParameterSlot(const QString& group,
+                                                     const unsigned int iParameterSlotNumber)
+        : EffectParameterSlotBase(group,
+                                  iParameterSlotNumber) {
+    QString itemPrefix = formatItemPrefix(iParameterSlotNumber);
     m_pControlLoaded = new ControlObject(
-        ConfigKey(m_group, itemPrefix + QString("_loaded")));
-    m_pControlLinkType = new ControlPushButton(
-        ConfigKey(m_group, itemPrefix + QString("_link_type")));
-    m_pControlLinkType->setButtonMode(ControlPushButton::TOGGLE);
-    m_pControlLinkType->setStates(EffectManifestParameter::NUM_LINK_TYPES);
+            ConfigKey(m_group, itemPrefix + QString("_loaded")));
     m_pControlValue = new ControlPushButton(
-        ConfigKey(m_group, itemPrefix));
+            ConfigKey(m_group, itemPrefix));
     m_pControlValue->setButtonMode(ControlPushButton::POWERWINDOW);
     m_pControlType = new ControlObject(
-        ConfigKey(m_group, itemPrefix + QString("_type")));
+            ConfigKey(m_group, itemPrefix + QString("_type")));
 
-    connect(m_pControlLinkType, SIGNAL(valueChanged(double)),
-            this, SLOT(slotLinkType(double)));
     connect(m_pControlValue, SIGNAL(valueChanged(double)),
             this, SLOT(slotValueChanged(double)));
 
     // Read-only controls.
     m_pControlType->connectValueChangeRequest(
-        this, SLOT(slotValueType(double)), Qt::AutoConnection);
+            this, SLOT(slotValueType(double)));
     m_pControlLoaded->connectValueChangeRequest(
-        this, SLOT(slotLoaded(double)), Qt::AutoConnection);
+            this, SLOT(slotLoaded(double)));
 
     clear();
 }
@@ -45,20 +38,26 @@ EffectButtonParameterSlot::~EffectButtonParameterSlot() {
 
 void EffectButtonParameterSlot::loadEffect(EffectPointer pEffect) {
     //qDebug() << debugString() << "loadEffect" << (pEffect ? pEffect->getManifest().name() : "(null)");
-    clear();
+    if (m_pEffectParameter) {
+        clear();
+    }
+
     if (pEffect) {
         m_pEffect = pEffect;
         // Returns null if it doesn't have a parameter for that number
-        m_pEffectParameter = pEffect->getButtonParameter(m_iParameterNumber);
+        m_pEffectParameter = pEffect->getButtonParameterForSlot(m_iParameterSlotNumber);
 
         if (m_pEffectParameter) {
+            // Set the number of states
+            int numStates = math_max(m_pEffectParameter->manifest().getSteps().size(), 2);
+            m_pControlValue->setStates(numStates);
             //qDebug() << debugString() << "Loading effect parameter" << m_pEffectParameter->name();
-            double dValue = m_pEffectParameter->getValue().toDouble();
-            double dMinimum = m_pEffectParameter->getMinimum().toDouble();
+            double dValue = m_pEffectParameter->getValue();
+            double dMinimum = m_pEffectParameter->getMinimum();
             double dMinimumLimit = dMinimum; // TODO(rryan) expose limit from EffectParameter
-            double dMaximum = m_pEffectParameter->getMaximum().toDouble();
+            double dMaximum = m_pEffectParameter->getMaximum();
             double dMaximumLimit = dMaximum; // TODO(rryan) expose limit from EffectParameter
-            double dDefault = m_pEffectParameter->getDefault().toDouble();
+            double dDefault = m_pEffectParameter->getDefault();
 
             if (dValue > dMaximum || dValue < dMinimum ||
                 dMinimum < dMinimumLimit || dMaximum > dMaximumLimit ||
@@ -77,15 +76,10 @@ void EffectButtonParameterSlot::loadEffect(EffectPointer pEffect) {
             m_pControlType->setAndConfirm(static_cast<double>(type));
             // Default loaded parameters to loaded and unlinked
             m_pControlLoaded->setAndConfirm(1.0);
-            m_pControlLinkType->set(m_pEffectParameter->getLinkType());
 
-            connect(m_pEffectParameter, SIGNAL(valueChanged(QVariant)),
-                    this, SLOT(slotParameterValueChanged(QVariant)));
+            connect(m_pEffectParameter, SIGNAL(valueChanged(double)),
+                    this, SLOT(slotParameterValueChanged(double)));
         }
-
-        // Update the newly loaded parameter to match the current chain
-        // superknob if it is linked.
-        onChainParameterChanged(m_dChainParameter);
     }
     emit(updated());
 }
@@ -102,31 +96,16 @@ void EffectButtonParameterSlot::clear() {
     m_pControlValue->set(0.0);
     m_pControlValue->setDefaultValue(0.0);
     m_pControlType->setAndConfirm(0.0);
-    m_pControlLinkType->set(EffectManifestParameter::LINK_NONE);
     emit(updated());
 }
 
-void EffectButtonParameterSlot::slotParameterValueChanged(QVariant value) {
+void EffectButtonParameterSlot::slotParameterValueChanged(double value) {
     //qDebug() << debugString() << "slotParameterValueChanged" << value.toDouble();
-    m_pControlValue->set(value.toDouble());
+    m_pControlValue->set(value);
 }
 
-void EffectButtonParameterSlot::onChainParameterChanged(double parameter) {
-    m_dChainParameter = parameter;
-    if (m_pEffectParameter != NULL) {
-        switch (m_pEffectParameter->getLinkType()) {
-            case EffectManifestParameter::LINK_INVERSE:
-                parameter = 1.0 - parameter;
-                // Intentional fall-through.
-            case EffectManifestParameter::LINK_LINKED:
-                if (parameter < 0.0 || parameter > 1.0) {
-                    return;
-                }
-                m_pControlValue->setParameterFrom(parameter, NULL);
-                break;
-            case EffectManifestParameter::LINK_NONE:
-            default:
-                break;
-        }
+void EffectButtonParameterSlot::slotValueChanged(double v) {
+    if (m_pEffectParameter) {
+        m_pEffectParameter->setValue(v);
     }
 }

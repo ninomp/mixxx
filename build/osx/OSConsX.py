@@ -119,7 +119,12 @@ def build_dmg(target, source, env):
         system('SetFile -a C "%s"' % dmg) #is there an sconsey way to declare this? Would be nice so that it could write what
 
 
-    if system("hdiutil create -srcfolder %s -format UDBZ -ov -volname %s %s" % (dmg, env['VOLNAME'], target)):
+    # TODO(rryan): hdiutil has a bug where if srcfolder is greater than 100M it
+    # fails to create a DMG with error -5341. The actual size of the resulting
+    # DMG is not affected by the -size parameter -- I think it's just the size
+    # of the "partition" in the DMG. Hard-coding 150M is a band-aid to get the
+    # build working again while we figure out the right solution.
+    if system("hdiutil create -size 150M -srcfolder %s -format UDBZ -ov -volname %s %s" % (dmg, env['VOLNAME'], target)):
         raise Exception("hdiutil create failed")
 
     shutil.rmtree(dmg)
@@ -279,7 +284,11 @@ def build_app(target, source, env):
 
     print "Installing embedded libs:"
     for ref, (abs, embedded) in locals.iteritems():
-        Execute(Copy(embedded, abs))
+        real_abs = os.path.realpath(abs)
+        print "installing", real_abs, "to", embedded
+        # NOTE(rryan): abs can be a symlink. we want to copy the binary it is
+        # pointing to. os.path.realpath does this for us.
+        Execute(Copy(embedded, real_abs))
         if not os.access(embedded, os.W_OK):
             print "Adding write permissions to %s" % embedded_p
             mode = os.stat(embedded).st_mode
@@ -289,8 +298,11 @@ def build_app(target, source, env):
 
     print "Installing plugins:"
     for p, embedded_p in plugins_l:
-        print "installing", p,"to",embedded_p
-        Execute(Copy(embedded_p, p)) #:/
+        real_p = os.path.realpath(p)
+        print "installing", real_p, "to", embedded_p
+        # NOTE(rryan): p can be a symlink. we want to copy the binary it is
+        # pointing to. os.path.realpath does this for us.
+        Execute(Copy(embedded_p, real_p)) #:/
         patch_lib(str(embedded_p))
 
 
@@ -392,6 +404,8 @@ def emit_app(target, source, env):
                   'CFBundleVersion': bundle_version,
                   'CFBundleShortVersionString': bundle_short_version_string,
                   'NSHumanReadableCopyright': human_readable_copyright,
+                  'NSPrincipalClass': 'NSApplication',
+                  'NSHighResolutionCapable': 'True',
                   'LSApplicationCategoryType': application_category_type,
                   'LSMinimumSystemVersion': minimum_osx_version}
     if env['FOR_APP_STORE']:

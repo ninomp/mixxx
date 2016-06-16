@@ -98,50 +98,38 @@ double ControlPotmeterBehavior::valueToMidiParameter(double dValue) {
 #define middlePosition ((maxPosition - minPosition) / 2.0)
 #define positionrange (maxPosition - minPosition)
 
-ControlLogPotmeterBehavior::ControlLogPotmeterBehavior(double dMinValue, double dMaxValue)
-        : ControlPotmeterBehavior(dMinValue, dMaxValue, false),
-          m_dB1(0.0),
-          m_dB2(0.0) {
-    if (dMaxValue == 1.0 || dMinValue != 0.0 ) {
-        m_bTwoState = false;
-        m_dB1 = log10((dMaxValue - dMinValue) + 1.0) / maxPosition;
+ControlLogPotmeterBehavior::ControlLogPotmeterBehavior(double dMinValue, double dMaxValue, double minDB)
+        : ControlPotmeterBehavior(dMinValue, dMaxValue, false) {
+    if (minDB >= 0) {
+        qWarning() << "ControlLogPotmeterBehavior::ControlLogPotmeterBehavior() minDB must be negative";
+        m_minDB = -1;
     } else {
-        m_bTwoState = true;
-        m_dB1 = log10(2.0) / middlePosition;
-        m_dB2 = log10(dMaxValue) / (maxPosition - middlePosition);
+        m_minDB = minDB;
     }
+    m_minOffset = db2ratio(m_minDB);
 }
 
 ControlLogPotmeterBehavior::~ControlLogPotmeterBehavior() {
 }
 
 double ControlLogPotmeterBehavior::valueToParameter(double dValue) {
+    if (m_dValueRange == 0.0) {
+        return 0;
+    }
     if (dValue > m_dMaxValue) {
         dValue = m_dMaxValue;
     } else if (dValue < m_dMinValue) {
         dValue = m_dMinValue;
     }
-    if (!m_bTwoState) {
-        return log10((dValue - m_dMinValue) + 1) / m_dB1;
-    } else {
-        if (dValue > 1.0) {
-            return log10(dValue) / m_dB2 + middlePosition;
-        } else {
-            return log10(dValue + 1.0) / m_dB1;
-        }
-    }
+    double linPrameter = (dValue - m_dMinValue) / m_dValueRange;
+    double dbParamter = ratio2db(linPrameter + m_minOffset * (1 - linPrameter));
+    return 1 - (dbParamter / m_minDB);
 }
 
 double ControlLogPotmeterBehavior::parameterToValue(double dParam) {
-    if (!m_bTwoState) {
-        return pow(10.0, m_dB1 * dParam) - 1.0 + m_dMinValue;
-    } else {
-        if (dParam <= middlePosition) {
-            return pow(10.0, m_dB1 * dParam) - 1;
-        } else {
-            return pow(10.0, m_dB2 * (dParam - middlePosition));
-        }
-    }
+    double dbParamter = (1 - dParam) * m_minDB;
+    double linPrameter = (db2ratio(dbParamter) - m_minOffset) / (1 - m_minOffset);
+    return m_dMinValue + (linPrameter * m_dValueRange);
 }
 
 ControlLinPotmeterBehavior::ControlLinPotmeterBehavior(double dMinValue, double dMaxValue,
@@ -173,7 +161,7 @@ double ControlAudioTaperPotBehavior::valueToParameter(double dValue) {
     } else if (dValue < 1.0) {
         // db + linear overlay to reach
         // m_minDB = 0
-        // 0 dB = m_neutralParame;
+        // 0 dB = m_neutralParameter
         double overlay = m_offset * (1 - dValue);
         if (m_minDB) {
             dParam = (ratio2db(dValue + overlay) - m_minDB) / m_minDB * m_neutralParameter * -1;
@@ -184,7 +172,7 @@ double ControlAudioTaperPotBehavior::valueToParameter(double dValue) {
         dParam = m_neutralParameter;
     } else if (dValue < m_dMaxValue) {
         // m_maxDB = 1
-        // 0 dB = m_neutralParame;
+        // 0 dB = m_neutralParameter
         dParam = (ratio2db(dValue) / m_maxDB * (1 - m_neutralParameter)) + m_neutralParameter;
     }
     //qDebug() << "ControlAudioTaperPotBehavior::valueToParameter" << "value =" << dValue << "dParam =" << dParam;
@@ -198,7 +186,7 @@ double ControlAudioTaperPotBehavior::parameterToValue(double dParam) {
     } else if (dParam < m_neutralParameter) {
         // db + linear overlay to reach
         // m_minDB = 0
-        // 0 dB = m_neutralParame;
+        // 0 dB = m_neutralParameter;
         if (m_minDB) {
             double db = (dParam * m_minDB / (m_neutralParameter * -1)) + m_minDB;
             dValue = (db2ratio(db) - m_offset) / (1 - m_offset) ;
@@ -216,7 +204,7 @@ double ControlAudioTaperPotBehavior::parameterToValue(double dParam) {
     return dValue;
 }
 
-double ControlAudioTaperPotBehavior::midiValueToParameter(double midiValue) const {
+double ControlAudioTaperPotBehavior::midiValueToParameter(double midiValue) {
     double dParam;
     if (m_neutralParameter && m_neutralParameter != 1.0) {
         double neutralTest = (midiValue - m_midiCorrection) / 127.0;
@@ -300,13 +288,14 @@ void ControlPushButtonBehavior::setValueFromMidiParameter(
 
     // This block makes push-buttons act as power window buttons.
     if (m_buttonMode == POWERWINDOW && m_iNumStates == 2) {
+        auto* timer = getTimer();
         if (pressed) {
             // Toggle on press
             double value = pControl->get();
             pControl->set(!value, NULL);
-            m_pushTimer.setSingleShot(true);
-            m_pushTimer.start(kPowerWindowTimeMillis);
-        } else if (!m_pushTimer.isActive()) {
+            timer->setSingleShot(true);
+            timer->start(kPowerWindowTimeMillis);
+        } else if (!timer->isActive()) {
             // Disable after releasing a long press
             pControl->set(0., NULL);
         }
@@ -322,13 +311,14 @@ void ControlPushButtonBehavior::setValueFromMidiParameter(
                 value = (int)(value + 1.) % m_iNumStates;
                 pControl->set(value, NULL);
                 if (m_buttonMode == LONGPRESSLATCHING) {
-                    m_pushTimer.setSingleShot(true);
-                    m_pushTimer.start(kLongPressLatchingTimeMillis);
+                    auto* timer = getTimer();
+                    timer->setSingleShot(true);
+                    timer->start(kLongPressLatchingTimeMillis);
                 }
             } else {
                 double value = pControl->get();
                 if (m_buttonMode == LONGPRESSLATCHING &&
-                        m_pushTimer.isActive() && value >= 1.) {
+                        getTimer()->isActive() && value >= 1.) {
                     // revert toggle if button is released too early
                     value = (int)(value - 1.) % m_iNumStates;
                     pControl->set(value, NULL);

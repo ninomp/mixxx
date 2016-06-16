@@ -1,16 +1,16 @@
+#include "engine/enginebufferscalerubberband.h"
+
 #include <rubberband/RubberBandStretcher.h>
 
 #include <QtDebug>
 
-#include "engine/enginebufferscalerubberband.h"
-
-#include "controlobject.h"
+#include "control/controlobject.h"
 #include "engine/readaheadmanager.h"
-#include "sampleutil.h"
 #include "track/keyutils.h"
 #include "util/counter.h"
-#include "util/math.h"
 #include "util/defs.h"
+#include "util/math.h"
+#include "util/sample.h"
 
 using RubberBand::RubberBandStretcher;
 
@@ -23,8 +23,6 @@ EngineBufferScaleRubberBand::EngineBufferScaleRubberBand(
           m_buffer_back(SampleUtil::alloc(MAX_BUFFER_LEN)),
           m_pRubberBand(NULL),
           m_pReadAheadManager(pReadAheadManager) {
-    qDebug() << "RubberBand version" << RUBBERBAND_VERSION;
-
     m_retrieve_buffer[0] = SampleUtil::alloc(MAX_BUFFER_LEN);
     m_retrieve_buffer[1] = SampleUtil::alloc(MAX_BUFFER_LEN);
 
@@ -52,21 +50,19 @@ void EngineBufferScaleRubberBand::initializeRubberBand(int iSampleRate) {
         iSampleRate, 2,
         RubberBandStretcher::OptionProcessRealTime);
     m_pRubberBand->setMaxProcessSize(kRubberBandBlockSize);
+    // Setting the time ratio to a very high value will cause RubberBand
+    // to preallocate buffers large enough to (almost certainly)
+    // avoid memory reallocations during playback.
+    m_pRubberBand->setTimeRatio(2.0);
+    m_pRubberBand->setTimeRatio(1.0);
 }
 
-void EngineBufferScaleRubberBand::setScaleParameters(int iSampleRate,
-                                                     double base_rate,
-                                                     bool speed_affects_pitch,
-                                                     double* speed_adjust,
-                                                     double* pitch_adjust) {
-    if (m_iSampleRate != iSampleRate) {
-        initializeRubberBand(iSampleRate);
-        m_iSampleRate = iSampleRate;
-    }
-
-    // Negative speed means we are going backwards. pitch_adjust does not affect
+void EngineBufferScaleRubberBand::setScaleParameters(double base_rate,
+                                                     double* pTempoRatio,
+                                                     double* pPitchRatio) {
+    // Negative speed means we are going backwards. pitch does not affect
     // the playback direction.
-    m_bBackwards = *speed_adjust < 0;
+    m_bBackwards = *pTempoRatio < 0;
 
     // Due to a bug in RubberBand, setting the timeRatio to a large value can
     // cause division-by-zero SIGFPEs. We limit the minimum seek speed to
@@ -76,24 +72,18 @@ void EngineBufferScaleRubberBand::setScaleParameters(int iSampleRate,
     // https://bugs.launchpad.net/ubuntu/+bug/1263233
     // https://bitbucket.org/breakfastquay/rubberband/issue/4/sigfpe-zero-division-with-high-time-ratios
     const double kMinSeekSpeed = 1.0 / 128.0;
-    double speed_abs = fabs(*speed_adjust);
+    double speed_abs = fabs(*pTempoRatio);
     if (speed_abs < kMinSeekSpeed) {
         // Let the caller know we ignored their speed.
-        speed_abs = *speed_adjust = 0;
+        speed_abs = *pTempoRatio = 0;
     }
 
     // RubberBand handles checking for whether the change in pitchScale is a
     // no-op.
-    double pitchScale = base_rate * KeyUtils::octaveChangeToPowerOf2(*pitch_adjust);
-
-    // The only difference for speed_affects_pitch is that we include speed_abs
-    // as part of the pitch scale.
-    if (speed_affects_pitch) {
-        pitchScale *= speed_abs;
-    }
+    double pitchScale = fabs(base_rate * *pPitchRatio);
 
     if (pitchScale > 0) {
-        //qDebug() << "EngineBufferScaleRubberBand setPitchScale" << *pitch_adjust << pitchScale;
+        //qDebug() << "EngineBufferScaleRubberBand setPitchScale" << *pitch << pitchScale;
         m_pRubberBand->setPitchScale(pitchScale);
     }
 
@@ -119,14 +109,18 @@ void EngineBufferScaleRubberBand::setScaleParameters(int iSampleRate,
             m_pRubberBand->setTimeRatio(1.0 / timeRatioInverse);
         }
         speed_abs = timeRatioInverse / base_rate;
-        *speed_adjust = m_bBackwards ? -speed_abs : speed_abs;
+        *pTempoRatio = m_bBackwards ? -speed_abs : speed_abs;
     }
 
     // Used by other methods so we need to keep them up to date.
     m_dBaseRate = base_rate;
-    m_bSpeedAffectsPitch = speed_affects_pitch;
-    m_dSpeedAdjust = speed_abs;
-    m_dPitchAdjust = *pitch_adjust;
+    m_dTempoRatio = speed_abs;
+    m_dPitchRatio = *pPitchRatio;
+}
+
+void EngineBufferScaleRubberBand::setSampleRate(int iSampleRate) {
+    initializeRubberBand(iSampleRate);
+    m_iSampleRate = iSampleRate;
 }
 
 void EngineBufferScaleRubberBand::clear() {
@@ -160,16 +154,14 @@ void EngineBufferScaleRubberBand::deinterleaveAndProcess(
                            frames, flush);
 }
 
-
-CSAMPLE* EngineBufferScaleRubberBand::getScaled(unsigned long buf_size) {
+double EngineBufferScaleRubberBand::getScaled(CSAMPLE* pOutput, const int buf_size) {
     // qDebug() << "EngineBufferScaleRubberBand::getScaled" << buf_size
     //          << "m_dSpeedAdjust" << m_dSpeedAdjust;
-    m_samplesRead = 0.0;
+    double samplesRead = 0.0;
 
-    if (m_dBaseRate == 0 || m_dSpeedAdjust == 0) {
-        memset(m_buffer, 0, sizeof(m_buffer[0]) * buf_size);
-        m_samplesRead = buf_size;
-        return m_buffer;
+    if (m_dBaseRate == 0 || m_dTempoRatio == 0) {
+        SampleUtil::clear(pOutput, buf_size);
+        return samplesRead;
     }
 
     const int iNumChannels = 2;
@@ -177,7 +169,7 @@ CSAMPLE* EngineBufferScaleRubberBand::getScaled(unsigned long buf_size) {
     unsigned long total_read_frames = 0;
 
     unsigned long remaining_frames = buf_size/iNumChannels;
-    CSAMPLE* read = m_buffer;
+    CSAMPLE* read = pOutput;
     bool last_read_failed = false;
     bool break_out_after_retrieve_and_reset_rubberband = false;
     while (remaining_frames > 0) {
@@ -186,7 +178,7 @@ CSAMPLE* EngineBufferScaleRubberBand::getScaled(unsigned long buf_size) {
         // zeros for reads that are not in cache. So it's safe to loop here
         // without any checks for failure in retrieveAndDeinterleave.
         unsigned long received_frames = retrieveAndDeinterleave(
-            read, remaining_frames);
+                read, remaining_frames);
         remaining_frames -= received_frames;
         total_received_frames += received_frames;
         read += received_frames * iNumChannels;
@@ -214,11 +206,10 @@ CSAMPLE* EngineBufferScaleRubberBand::getScaled(unsigned long buf_size) {
         //qDebug() << "iLenFramesRequired" << iLenFramesRequired;
 
         if (remaining_frames > 0 && iLenFramesRequired > 0) {
-            unsigned long iAvailSamples = m_pReadAheadManager
-                    ->getNextSamples(
+            unsigned long iAvailSamples = m_pReadAheadManager->getNextSamples(
                         // The value doesn't matter here. All that matters is we
                         // are going forward or backward.
-                        (m_bBackwards ? -1.0 : 1.0) * m_dBaseRate * m_dSpeedAdjust,
+                        (m_bBackwards ? -1.0 : 1.0) * m_dBaseRate * m_dTempoRatio,
                         m_buffer_back,
                         iLenFramesRequired * iNumChannels);
             unsigned long iAvailFrames = iAvailSamples / iNumChannels;
@@ -251,11 +242,11 @@ CSAMPLE* EngineBufferScaleRubberBand::getScaled(unsigned long buf_size) {
     // account directionality or starting point.
     // NOTE(rryan): Why no m_dPitchAdjust here? Pitch does not change the time
     // ratio. m_dSpeedAdjust is the ratio of unstretched time to stretched
-    // time. So, if we used total_received_frames*iNumChannels in stretched
+    // time. So, if we used total_received_frames * iNumChannels in stretched
     // time, then multiplying that by the ratio of unstretched time to stretched
     // time will get us the unstretched samples read.
-    m_samplesRead = m_dBaseRate * m_dSpeedAdjust *
+    samplesRead = m_dBaseRate * m_dTempoRatio *
             total_received_frames * iNumChannels;
 
-    return m_buffer;
+    return samplesRead;
 }

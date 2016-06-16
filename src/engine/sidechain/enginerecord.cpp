@@ -17,9 +17,9 @@
 
 #include "engine/sidechain/enginerecord.h"
 
-#include "configobject.h"
-#include "controlobject.h"
-#include "controlobjectslave.h"
+#include "preferences/usersettings.h"
+#include "control/controlobject.h"
+#include "control/controlproxy.h"
 #include "encoder/encoder.h"
 
 #ifdef __FFMPEGFILE__
@@ -30,20 +30,30 @@
 #include "encoder/encodervorbis.h"
 #endif
 
-#include "errordialoghandler.h"
-#include "playerinfo.h"
+#include "mixer/playerinfo.h"
 #include "recording/defs_recording.h"
 #include "util/event.h"
 
 const int kMetaDataLifeTimeout = 16;
 
-EngineRecord::EngineRecord(ConfigObject<ConfigValue>* _config)
-        : m_pConfig(_config),
+EngineRecord::EngineRecord(UserSettingsPointer pConfig)
+        : m_pConfig(pConfig),
           m_pEncoder(NULL),
           m_pSndfile(NULL),
-          m_iMetaDataLife(0) {
-    m_pRecReady = new ControlObjectSlave(RECORDING_PREF_KEY, "status", this);
-    m_pSamplerate = new ControlObjectSlave("[Master]", "samplerate", this);
+          m_frames(0),
+          m_recordedDuration(0),
+          m_iMetaDataLife(0),
+          m_cueTrack(0),
+          m_bCueIsEnabled(false) {
+    m_sfInfo.frames = 0;
+    m_sfInfo.samplerate = 0;
+    m_sfInfo.channels = 0;
+    m_sfInfo.format = 0;
+    m_sfInfo.sections = 0;
+    m_sfInfo.seekable = 0;
+
+    m_pRecReady = new ControlProxy(RECORDING_PREF_KEY, "status", this);
+    m_pSamplerate = new ControlProxy("[Master]", "samplerate", this);
     m_sampleRate = m_pSamplerate->get();
 }
 
@@ -122,11 +132,11 @@ bool EngineRecord::metaDataHasChanged()
     m_iMetaDataLife = 0;
 
     TrackPointer pTrack = PlayerInfo::instance().getCurrentPlayingTrack();
-    if ( !pTrack )
+    if (!pTrack)
         return false;
 
-    if ( m_pCurrentTrack ) {
-        if ((pTrack->getId() == -1) || (m_pCurrentTrack->getId() == -1)) {
+    if (m_pCurrentTrack) {
+        if (!pTrack->getId().isValid() || !m_pCurrentTrack->getId().isValid()) {
             if ((pTrack->getArtist() == m_pCurrentTrack->getArtist()) &&
                 (pTrack->getTitle() == m_pCurrentTrack->getArtist())) {
                 return false;
@@ -150,7 +160,7 @@ void EngineRecord::process(const CSAMPLE* pBuffer, const int iBufferSize) {
         if (fileOpen()) {
             Event::end("EngineRecord recording");
             closeFile();  // Close file and free encoder.
-            emit(isRecording(false));
+            emit(isRecording(false, false));
         }
     } else if (recordingStatus == RECORD_READY) {
         // If we are ready for recording, i.e, the output file has been selected, we
@@ -159,8 +169,8 @@ void EngineRecord::process(const CSAMPLE* pBuffer, const int iBufferSize) {
         if (openFile()) {
             Event::start("EngineRecord recording");
             qDebug("Setting record flag to: ON");
-            m_pRecReady->slotSet(RECORD_ON);
-            emit(isRecording(true));  // will notify the RecordingManager
+            m_pRecReady->set(RECORD_ON);
+            emit(isRecording(true, false));  // will notify the RecordingManager
 
             // Since we just started recording, timeout and clear the metadata.
             m_iMetaDataLife = kMetaDataLifeTimeout;
@@ -175,9 +185,11 @@ void EngineRecord::process(const CSAMPLE* pBuffer, const int iBufferSize) {
                 m_cueTrack = 0;
             }
         } else {  // Maybe the encoder could not be initialized
+            qDebug() << "Could not open" << m_fileName << "for writing.";
             qDebug("Setting record flag to: OFF");
             m_pRecReady->slotSet(RECORD_OFF);
-            emit(isRecording(false));
+            // An error occurred.
+            emit(isRecording(false, true));
         }
     } else if (recordingStatus == RECORD_ON) {
         // If recording is enabled process audio to compressed or uncompressed data.
@@ -232,9 +244,8 @@ void EngineRecord::writeCueLine() {
                                     % 75);
 
     m_cueFile.write(QString("  TRACK %1 AUDIO\n")
-            .arg((double)m_cueTrack, 2, 'f', 0, '0')
-        .toLatin1()
-    );
+                    .arg((double)m_cueTrack, 2, 'f', 0, '0')
+                    .toLatin1());
 
     m_cueFile.write(QString("    TITLE \"%1\"\n")
         .arg(m_pCurrentTrack->getTitle()).toLatin1());
@@ -276,15 +287,16 @@ bool EngineRecord::fileOpen() {
 
 bool EngineRecord::openFile() {
     // Unfortunately, we cannot use QFile for writing WAV and AIFF audio.
-    if (m_encoding == ENCODING_WAVE || m_encoding == ENCODING_AIFF){
+    if (m_encoding == ENCODING_WAVE || m_encoding == ENCODING_AIFF) {
         // set sfInfo
         m_sfInfo.samplerate = m_sampleRate;
         m_sfInfo.channels = 2;
 
-        if (m_encoding == ENCODING_WAVE)
+        if (m_encoding == ENCODING_WAVE) {
             m_sfInfo.format = SF_FORMAT_WAV | SF_FORMAT_PCM_16;
-        else
+        } else {
             m_sfInfo.format = SF_FORMAT_AIFF | SF_FORMAT_PCM_16;
+        }
 
         // Creates a new WAVE or AIFF file and writes header information.
 #ifdef __WINDOWS__
@@ -292,33 +304,31 @@ bool EngineRecord::openFile() {
         LPCWSTR lpcwFilename = (LPCWSTR)m_fileName.utf16();
         m_pSndfile = sf_wchar_open(lpcwFilename, SFM_WRITE, &m_sfInfo);
 #else
-        QByteArray qbaFilename = m_fileName.toLocal8Bit();
-        m_pSndfile = sf_open(qbaFilename.constData(), SFM_WRITE, &m_sfInfo);
+        m_pSndfile = sf_open(m_fileName.toLocal8Bit().constData(), SFM_WRITE, &m_sfInfo);
 #endif
         if (m_pSndfile) {
             sf_command(m_pSndfile, SFC_SET_NORM_FLOAT, NULL, SF_TRUE);
             // Set meta data
-            int ret;
-
-            ret = sf_set_string(m_pSndfile, SF_STR_TITLE, m_baTitle.constData());
-            if(ret != 0)
-                qDebug("libsndfile: %s", sf_error_number(ret));
+            int ret = sf_set_string(m_pSndfile, SF_STR_TITLE, m_baTitle.constData());
+            if (ret != 0) {
+                qWarning("libsndfile error: %s", sf_error_number(ret));
+            }
 
             ret = sf_set_string(m_pSndfile, SF_STR_ARTIST, m_baAuthor.constData());
-            if(ret != 0)
-                qDebug("libsndfile: %s", sf_error_number(ret));
+            if (ret != 0) {
+                qWarning("libsndfile error: %s", sf_error_number(ret));
+            }
 
             ret = sf_set_string(m_pSndfile, SF_STR_COMMENT, m_baAlbum.constData());
-            if(ret != 0)
-                qDebug("libsndfile: %s", sf_error_number(ret));
-
+            if (ret != 0) {
+                qWarning("libsndfile error: %s", sf_error_number(ret));
+            }
         }
     } else {
         // We can use a QFile to write compressed audio.
         if (m_pEncoder) {
             m_file.setFileName(m_fileName);
             if (!m_file.open(QIODevice::WriteOnly)) {
-                qDebug() << "Could not write:" << m_fileName;
                 return false;
             }
             if (m_file.handle() != -1) {
@@ -329,19 +339,8 @@ bool EngineRecord::openFile() {
         }
     }
 
-    // Check if file is really open.
-    if (!fileOpen()) {
-        ErrorDialogProperties* props = ErrorDialogHandler::instance()->newDialogProperties();
-        props->setType(DLG_WARNING);
-        props->setTitle(tr("Recording"));
-        props->setText("<html>"+tr("Could not create audio file for recording!")
-                       +"<p>"+tr("Ensure there is enough free disk space and you have write permission for the Recordings folder.")
-                       +"<p>"+tr("You can change the location of the Recordings folder in Preferences > Recording.")
-                       +"</p></html>");
-        ErrorDialogHandler::instance()->requestErrorDialog(props);
-        return false;
-    }
-    return true;
+    // Return whether the file is really open.
+    return fileOpen();
 }
 
 bool EngineRecord::openCueFile() {

@@ -8,25 +8,25 @@
 #include <QMutex>
 
 #include "engine/enginecontrol.h"
-#include "configobject.h"
-#include "trackinfoobject.h"
+#include "preferences/usersettings.h"
+#include "control/controlproxy.h"
+#include "track/track.h"
 
 #define NUM_HOT_CUES 37
 
 class ControlObject;
 class ControlPushButton;
-class Cue;
 class ControlIndicator;
 
 class HotcueControl : public QObject {
     Q_OBJECT
   public:
-    HotcueControl(const char* pGroup, int hotcueNumber);
+    HotcueControl(QString group, int hotcueNumber);
     virtual ~HotcueControl();
 
     inline int getHotcueNumber() { return m_iHotcueNumber; }
-    inline Cue* getCue() { return m_pCue; }
-    inline void setCue(Cue* pCue) { m_pCue = pCue; }
+    inline CuePointer getCue() { return m_pCue; }
+    inline void setCue(CuePointer pCue) { m_pCue = pCue; }
     inline ControlObject* getPosition() { return m_hotcuePosition; }
     inline ControlObject* getEnabled() { return m_hotcueEnabled; }
 
@@ -58,11 +58,11 @@ class HotcueControl : public QObject {
     void hotcuePlay(double v);
 
   private:
-    ConfigKey keyForControl(int hotcue, QString name);
+    ConfigKey keyForControl(int hotcue, const char* name);
 
-    const char* m_pGroup;
+    QString m_group;
     int m_iHotcueNumber;
-    Cue* m_pCue;
+    CuePointer m_pCue;
 
     // Hotcue state controls
     ControlObject* m_hotcuePosition;
@@ -83,19 +83,18 @@ class HotcueControl : public QObject {
 class CueControl : public EngineControl {
     Q_OBJECT
   public:
-    CueControl(const char* _group,
-               ConfigObject<ConfigValue>* _config);
+    CueControl(QString group,
+               UserSettingsPointer pConfig);
     virtual ~CueControl();
 
-    virtual void hintReader(QVector<Hint>* pHintList);
-    double updateIndicatorsAndModifyPlay(double play, bool playPossible);
+    virtual void hintReader(HintVector* pHintList);
+    bool updateIndicatorsAndModifyPlay(bool newPlay, bool playPossible);
     void updateIndicators();
     bool isTrackAtCue();
     bool getPlayFlashingAtPause();
 
   public slots:
-    void trackLoaded(TrackPointer pTrack);
-    void trackUnloaded(TrackPointer pTrack);
+    void trackLoaded(TrackPointer pNewTrack, TrackPointer pOldTrack) override;
 
   private slots:
     void cueUpdated();
@@ -123,19 +122,18 @@ class CueControl : public EngineControl {
   private:
     // These methods are not thread safe, only call them when the lock is held.
     void createControls();
-    void attachCue(Cue* pCue, int hotcueNumber);
+    void attachCue(CuePointer pCue, int hotcueNumber);
     void detachCue(int hotcueNumber);
     void saveCuePoint(double cuePoint);
 
-    bool m_bHotcueCancel;
     bool m_bPreviewing;
-    bool m_bPreviewingHotcue;
     ControlObject* m_pPlayButton;
     ControlObject* m_pStopButton;
     int m_iCurrentlyPreviewingHotcues;
     ControlObject* m_pQuantizeEnabled;
     ControlObject* m_pNextBeat;
     ControlObject* m_pClosestBeat;
+    bool m_bypassCueSetByPlay;
 
     const int m_iNumHotCues;
     QList<HotcueControl*> m_hotcueControl;
@@ -153,6 +151,8 @@ class CueControl : public EngineControl {
     ControlPushButton* m_pCueGotoAndPlay;
     ControlPushButton* m_pCueGotoAndStop;
     ControlPushButton* m_pCuePreview;
+    ControlProxy* m_pVinylControlEnabled;
+    ControlProxy* m_pVinylControlMode;
 
     TrackPointer m_pLoadedTrack;
 

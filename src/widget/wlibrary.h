@@ -10,17 +10,16 @@
 #include <QString>
 #include <QEvent>
 
-#include "trackinfoobject.h"
 #include "library/libraryview.h"
+#include "track/track.h"
 #include "widget/wbasewidget.h"
 
-class MixxxKeyboard;
+class KeyboardEventFilter;
 
 class WLibrary : public QStackedWidget, public WBaseWidget {
     Q_OBJECT
   public:
-    WLibrary(QWidget* parent);
-    virtual ~WLibrary();
+    explicit WLibrary(QWidget* parent);
 
     // registerView is used to add a view to the LibraryWidget which the widget
     // can disply on request via showView(). To switch to a given view, call
@@ -44,7 +43,7 @@ class WLibrary : public QStackedWidget, public WBaseWidget {
     void switchToSelector();
     void setSeedTrack(TrackPointer pTrack);
   protected:
-    bool event(QEvent* pEvent);
+    bool event(QEvent* pEvent) override;
 
 
   private:

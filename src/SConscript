@@ -54,7 +54,7 @@ if build.platform_is_windows:
         now = datetime.datetime.now()
         str_list.append('#define CUR_YEAR                    "'+str(now.year)+'"\n\n')
 
-        if build.msvcdebug:
+        if build.build_is_debug:
             str_list.append('#define DEBUG                       1\n')
         if 'pre' in mixxx_version.lower():
             str_list.append('#define PRERELEASE                  1\n')
@@ -74,6 +74,12 @@ elif build.platform_is_osx:
 else:
         mixxx_bin = env.Program('mixxx', sources)
 
+# For convenience, copy the Mixxx binary out of the build directory to the
+# root. Don't do it on windows because the binary can't run on its own and needs
+# the DLLs present with it.
+if not build.platform_is_windows:
+    Command("../mixxx", mixxx_bin, Copy("$TARGET", "$SOURCE"))
+
 test_bin = None
 def build_tests():
         global test_bin
@@ -81,8 +87,9 @@ def build_tests():
         test_env = env.Clone()
         test_env.Append(CPPPATH="#lib/gtest-1.7.0/include")
         test_env.Append(CPPPATH="#lib/gmock-1.7.0/include")
-        test_files = [test_env.StaticObject(filename) \
-                              if filename !='main.cpp' else filename
+        test_env.Append(CPPPATH="#lib/benchmark/include")
+        test_files = [test_env.StaticObject(filename)
+                      if filename !='main.cpp' else filename
                       for filename in test_files]
         mixxx_sources = [filename for filename in sources if filename != 'main.cpp']
         test_sources = (test_files + mixxx_sources)
@@ -93,11 +100,19 @@ def build_tests():
         env.Append(LIBPATH="#lib/gmock-1.7.0/lib")
         env.Append(LIBS = 'gmock')
 
-        if build.platform_is_windows:
-                # We want a terminal for tests.
-                env['LINKFLAGS'].remove('/subsystem:windows')
-                env['LINKFLAGS'].append('/subsystem:console')
+        env.Append(LIBPATH="#lib/benchmark/lib")
+        env.Append(LIBS = 'benchmark')
 
+        if build.platform_is_windows:
+                # For SHGetValueA in Google's benchmark library.
+                env.Append(LIBS = 'Shlwapi')
+
+                # TODO(rryan): Build Mixxx core as a shared object and link it
+                # into mixxx and mixxx-test. We could build both in different
+                # environments right now but then automoc and protoc get run in
+                # both environments which makes SCons unhappy.
+                # Currently both executables are built with /subsystem:windows
+                # and the console is attached manually
                 test_bin = env.Program(
                         'mixxx-test', [test_sources, env.RES('#src/mixxx.rc')],
                         LINKCOM = [env['LINKCOM'], 'mt.exe -nologo -manifest ${TARGET}.manifest -outputresource:$TARGET;1'])
@@ -123,37 +138,86 @@ if 'test' in BUILD_TARGETS:
         print "Running tests."
         run_tests()
 
-def osx_construct_version(build, mixxx_version, branch_name, vcs_revision):
-        # In release mode, we only use the version.
-        if build.build_is_release:
-                return mixxx_version
-        elif branch_name.startswith('release-'):
-                return '%s-%s%s' % (mixxx_version, vcs_name, vcs_revision)
-        # In a debug build, include the branch name and revision number
-        return "%s-%s-%s%s" % (mixxx_version, branch_name, vcs_name, vcs_revision)
+def construct_version(build, mixxx_version, branch_name, vcs_revision):
+        if branch_name.startswith('release-'):
+                branch_name = branch_name.replace('release-', '')
+
+        # Include build type in the filename.
+        build_type = 'release' if build.build_is_release else 'debug'
+
+        # New, simpler logic: mixxx version, branch name, git revision,
+        # release/build. Example: mixxx-1.12.0-master-gitXXXX-release
+        return "%s-%s-%s%s-%s" % (mixxx_version, branch_name, vcs_name,
+                                  vcs_revision, build_type)
 
 def ubuntu_construct_version(build, mixxx_version, branch_name, vcs_revision,
-                             ubuntu_version):
-        # Underscores are not ok in version names, dashes are fine though.
-        if branch_name:
-                branch_name = branch_name.replace('_', '-')
-        # In release mode, we only use the version and ubuntu_version
-        if build.build_is_release:
-                return "%s-%s" % (mixxx_version, ubuntu_version)
-        elif branch_name.startswith('release-'):
-                return "%s-%s%s" % (mixxx_version, vcs_name, vcs_revision)
-        # In a debug build, include the branch name and revision number
-        return "%s-%s~%s~%s%s" % (mixxx_version, ubuntu_version,
-                                   branch_name, vcs_name, vcs_revision)
+                             ubuntu_version, distro_version):
+        # The format of a Debian/Ubuntu version is:
+        #
+        #   [epoch:]upstream_version[-debian_revision]
+        #
+        # A detailed description of the valid characters and sorting order of
+        # versions can be found here:
+        # https://www.debian.org/doc/debian-policy/ch-controlfields.html#s-f-Version
+        #
+        # For package upgrades to work correctly, we want the following
+        # orderings on package versions:
+        #
+        # nightly build < pre-alpha < alpha < beta < rc1 < rc2 < final release
+        #
+        # The sorting rules are complicated but the key detail is: "The lexical
+        # comparison is a comparison of ASCII values modified so that all the
+        # letters sort earlier than all the non-letters and so that a tilde
+        # sorts before anything, even the end of a part."
+        #
+        # The Mixxx version stored in src/defs_version.h (the "mixxx_version"
+        # parameter to this function) is formatted like:
+        #
+        # Pre Alpha: 2.0.0-alpha-pre
+        # Alpha: 2.0.0-alpha
+        # Beta: 2.0.0-beta
+        # RC: 2.0.0-rc1
+        # Final: 2.0.0
+        #
+        # Since hyphens are a separator character between the upstream version
+        # and Debian version, we replace these with tildes.
+        #
+        # Other goals:
+        # - We would like to know the branch and commit of a package.
+        # - We would like the PPA to trump the official Debian package.
+        #
+        # The following versions are sorted from low to high order:
+        # 1.9.9
+        # 2.0.0~alpha~pre
+        # 2.0.0~alpha
+        # 2.0.0~beta~pre
+        # 2.0.0~beta
+        # 2.0.0~dfsg4 <- official Debian package version
+        # 2.0.0~rc1
+        # 2.0.0
+        # 2.0.1~alpha~pre
+        #
+        # Our official Debian packages have a ~dfsg section, so in this case an
+        # rc1 package in our PPA would trump an official Debian package
+        # (probably not what we want but not too bad since we would probably
+        # publish a "2.0.0" final to our PPA before the official Debian package
+        # is even released.
+        #
+        # Note in the above sorted list that if the branch name were included
+        # after the mixxx_version, 2.0.0~master would sort earlier than
+        # 2.0.0~rc1~master!  To prevent branch and revision tags from
+        # interfering with package ordering we include them in the
+        # debian_revision portion of the version. This ensures they are only
+        # used for sorting if the upstream version of two packages is identical.
+        upstream_version = mixxx_version.replace('-', '~')
+        assert '_' not in upstream_version
 
-def windows_construct_version(build, mixxx_version, branch_name, vcs_revision):
-        # In release mode, we only use the version
-        if build.build_is_release:
-                return mixxx_version
-        elif branch_name.startswith('release-'):
-                return '%s-%s%s' % (mixxx_version, vcs_name, vcs_revision)
-        # In a debug build, include the branch name and revision number
-        return "%s-%s-%s%s" % (mixxx_version, branch_name, vcs_name, vcs_revision)
+        # Strip underscores and dashes in the branch name.
+        branch_name = branch_name.strip('_-')
+        assert branch_name and branch_name != '(no branch)'
+
+        return "%s-%s~%s~%s%s~%s" % (upstream_version, ubuntu_version, branch_name,
+                                     vcs_name, vcs_revision, distro_version)
 
 #Set up the install target
 #=========================
@@ -166,13 +230,21 @@ def windows_construct_version(build, mixxx_version, branch_name, vcs_revision):
 #        unix_share_path = flags['prefix'] + "/share"
 #        unix_bin_path   = flags['prefix'] + "/bin"
 
+bundle_pdbs = build.platform_is_windows and (
+        build.build_is_debug or
+        SCons.ARGUMENTS.get('bundle_pdbs', '') in ('yes', 'y', '1'))
+
 #Mixxx binary
 binary_files = [mixxx_bin];
 if test_bin is not None:
         binary_files.append(test_bin)
+        if bundle_pdbs:
+                binary_files.append(
+                        Glob('#' + os.path.join(build.build_dir, 'mixxx-test.pdb')))
 
-# Mixxx essential resource files
-resource_files = Glob('#res/schema.xml')
+if bundle_pdbs:
+        binary_files.append(
+                Glob('#' + os.path.join(build.build_dir, 'mixxx.pdb')))
 
 #Soundsource plugins
 soundsource_plugin_files = soundsource_plugins
@@ -187,7 +259,10 @@ skin_files = Glob('#res/skins/*')
 controllermappings_files = Glob('#res/controllers/*')
 
 # Translation files
-translation_files = Glob('#res/translations/*.qm')
+translation_files = Glob('#res/translations/*.qm') + Glob(os.path.join(build.env['QTDIR'], 'translations/qt_*.qm'))
+
+# Font files
+font_files = Glob('#res/fonts/*')
 
 #Keyboard mapping(s)
 keyboardmappings_files = Glob('#res/keyboard/*')
@@ -201,7 +276,13 @@ docs_files += Glob('#./README')
 docs_files += Glob('#./Mixxx-Manual.pdf')
 
 #.desktop file for KDE/GNOME menu
-dotdesktop_files = Glob('#src/mixxx.desktop')
+dotdesktop_files = Glob('#res/linux/mixxx.desktop')
+
+#.appdata.xml file for KDE/GNOME AppStream iniative
+dotappstream_files = Glob('#res/linux/mixxx.appdata.xml')
+
+#udev rule file for USB HID and Bulk controllers
+hidudev_files = Glob('#res/linux/mixxx.usb.rules')
 
 #Icon file for menu entry
 icon_files = Glob('#res/images/mixxx-icon.png')
@@ -213,42 +294,61 @@ image_files = Glob('#res/images/preferences/*')  # These are compiled in to the 
 
 # TODO: Use reference to SharedLibrary for libsndfile and others, glob only gets
 # all files on 2+ builds after a clean.
+dll_files = []
 if build.toolchain_is_msvs:
         mixxx_winlib_path = SCons.ARGUMENTS.get('winlib', '..\\..\\..\\mixxx-win32lib-msvc90-release')
         # skip the MSVC DLLs incase they're in there too
-        dll_files = Glob('%s/[!"msvc"]*.dll' % mixxx_winlib_path)
+        dll_files.extend(Glob('%s/*.dll' % mixxx_winlib_path))
+        dll_files.extend(Glob('%s/lib/*.dll' % mixxx_winlib_path))
+
+        if bundle_pdbs:
+                dll_files.extend(Glob('%s/*.pdb' % mixxx_winlib_path))
+                dll_files.extend(Glob('%s/lib/*.pdb' % mixxx_winlib_path))
 elif build.crosscompile and build.platform_is_windows and build.toolchain_is_gnu:
         # We're cross-compiling, grab these from the crosscompile bin
         # folder. How should we be doing this?
         dll_files = Glob('#/../../mixxx-win%slib-crossmingw' % build.bitwidth)
-elif build.crosscompile and build.platform_is_osx:
-        # Glob appropriate dylib files. We have 4 different library types,
-        # x86_64, x86, powerpc, powerpc64
-        dylib_files = Glob('#/../../mixxx-osx-%s-crossmingw' % build.machine)
-else:
-        dll_files = list() # dll_files += on the next line required dll_files to exist
 
 qt_modules = depends.Qt.enabled_modules(build)
 qt5 = depends.Qt.qt5_enabled(build)
 
 if qt5:
-        suffix = 'd.dll' if build.msvcdebug else '.dll'
+        suffix = 'd.dll' if build.build_is_debug else '.dll'
         qt_modules = ['$QTDIR/lib/' + module.replace('Qt', 'Qt5') + suffix
                       for module in qt_modules]
         dll_files.extend(qt_modules)
 else:
-        suffix = 'd4.dll' if build.msvcdebug else '4.dll'
+        suffix = 'd4.dll' if build.build_is_debug else '4.dll'
         qt_modules = ['$QTDIR/lib/' + module + suffix for module in qt_modules]
-        # TODO(rryan): Is this needed? We don't use phonon.
-        qt_modules.append('$QTDIR/lib/phonon' + suffix)
         dll_files.extend(qt_modules)
 
-if int(flags.get('sqlitedll', 0)):
+# Qt imageformats plugin
+imgfmtdll_files = []
+qt_imagesformats = depends.Qt.enabled_imageformats(build)
+
+if qt5:
+        suffix = 'd.dll' if build.build_is_debug else '.dll'
+        imgfmtdll_files.extend(['$QTDIR/plugins/imageformats/' + module + suffix for module in qt_imagesformats])
+        # We don't have Qt's dll pdb files in our release build environements, so only if build is debug
+        pdbSuffix = 'd.pdb' if (bundle_pdbs and build.build_is_debug) else ''
+        if pdbSuffix:
+                 imgfmtdll_files.extend(['$QTDIR/plugins/imageformats/' + module + pdbSuffix for module in qt_imagesformats])
+else:
+        suffix = 'd4.dll' if build.build_is_debug else '4.dll'
+        if not build.static_dependencies:
+                imgfmtdll_files.extend(['$QTDIR/plugins/imageformats/' + module + suffix for module in qt_imagesformats])
+        # We don't have Qt's dll pdb files in our release build environements, so only if build is debug
+        pdbSuffix = 'd4.pdb' if (bundle_pdbs and build.build_is_debug) else ''
+        if pdbSuffix:
+                imgfmtdll_files.extend(['$QTDIR/plugins/imageformats/' + module + pdbSuffix for module in qt_imagesformats])
+
+sqldll_files = []
+if int(flags.get('qt_sqlite_plugin', 0)):
         if qt5:
                 # TODO(rryan): Add the SQLite DLL For Qt5.
                 pass
         else:
-                suffix = 'd4.dll' if build.msvcdebug else '4.dll'
+                suffix = 'd4.dll' if build.build_is_debug else '4.dll'
                 # Qt SQLite plugin
                 sqldll_files = ['$QTDIR/plugins/sqldrivers/qsqlite' + suffix]
 
@@ -272,9 +372,9 @@ if build.platform_is_linux or build.platform_is_bsd:
                     env.get('LIBDIR', default='lib'))
 
                 binary = env.Install(unix_bin_path, binary_files)
-                resource = env.Install(os.path.join(unix_share_path, 'mixxx'), resource_files)
                 skins = env.Install(os.path.join(unix_share_path, 'mixxx', 'skins'), skin_files)
-		vamp_plugin =  env.Install(
+                fonts = env.Install(os.path.join(unix_share_path, 'mixxx', 'fonts'), font_files)
+                vamp_plugin =  env.Install(
                         os.path.join(unix_lib_path, 'mixxx', 'plugins', 'vamp'),
                         libmixxxminimal_vamp_plugin)
 
@@ -285,23 +385,33 @@ if build.platform_is_linux or build.platform_is_bsd:
                 translations = env.Install(os.path.join(unix_share_path, 'mixxx', 'translations'), translation_files)
                 keyboardmappings = env.Install(os.path.join(unix_share_path, 'mixxx', 'keyboard'), keyboardmappings_files)
                 dotdesktop = env.Install(os.path.join(unix_share_path, 'applications'), dotdesktop_files)
+                dotappstream = env.Install(os.path.join(unix_share_path, 'appdata'), dotappstream_files)
                 docs = env.Install(os.path.join(unix_share_path, 'doc', 'mixxx'), docs_files)
                 icon = env.Install(os.path.join(unix_share_path, 'pixmaps'), icon_files)
                 promotracks = env.Install(os.path.join(unix_share_path, 'mixxx', 'promo'), promotracks_files)
 
+                # NOTE(rryan): Hack to detect when we're Debian packaging.
+                building_debian_package = 'debian/tmp/usr' in install_root
+                udev_root = '/etc/udev/rules.d'
+                hidudev = env.Install(udev_root, hidudev_files)
+
                 #Makes each of those Install builders get fired off when you run "scons install" :)
                 env.Alias('install', binary)
-                env.Alias('install', resource)
                 env.Alias('install', skins)
+                env.Alias('install', fonts)
                 env.Alias('install', soundsource_plugins)
                 env.Alias('install', controllermappings)
                 env.Alias('install', translations)
                 env.Alias('install', keyboardmappings)
                 env.Alias('install', docs)
                 env.Alias('install', dotdesktop)
+                env.Alias('install', dotappstream)
                 env.Alias('install', icon)
                 env.Alias('install', promotracks)
-		env.Alias('install', vamp_plugin)
+                env.Alias('install', vamp_plugin)
+
+                if not building_debian_package and os.access(udev_root, os.W_OK):
+                        env.Alias('install', hidudev)
 
                 #Delete the old Mixxx installation (because SCONS won't overwrite it)
                 #if 'install' in COMMAND_LINE_TARGETS:
@@ -327,10 +437,18 @@ if build.platform_is_osx and 'bundle' in COMMAND_LINE_TARGETS:
         # this is a BIG HACK to support Qt's plugins (since Qt *requires* that
         # it's plugins be in specific subdirectories, which OS X doesn't really
         # play nice with)
-        qt_plugins = ([("iconengines", e) for e in ["libqsvgicon.dylib"]] +
-                      [("imageformats", e) for e in ["libqgif.dylib", "libqjpeg.dylib", "libqsvg.dylib"]] +
-                      [("sqldrivers", e) for e in ["libqsqlite.dylib"]] +
-                      [("accessible", e) for e in ["libqtaccessiblewidgets.dylib"]])
+
+        # NOTE(rryan): Only include the SQLite plugin if we are building Qt in
+        # sqlite_plugin mode.
+        sql_dylibs = []
+        if int(flags.get('qt_sqlite_plugin', 0)):
+                sql_dylibs = ["libqsqlite.dylib"]
+
+        qt_plugins = (
+                [("iconengines", e) for e in ["libqsvgicon.dylib"]] +
+                [("imageformats", e) for e in ["libqgif.dylib", "libqjpeg.dylib", "libqsvg.dylib"]] +
+                [("sqldrivers", e) for e in sql_dylibs] +
+                [("accessible", e) for e in ["libqtaccessiblewidgets.dylib"]])
         #Left out libqmng and libqtiff to save space.
 
         # Concatenate the SoundSource plugins to our list of plugins (converting
@@ -338,16 +456,15 @@ if build.platform_is_osx and 'bundle' in COMMAND_LINE_TARGETS:
         for x in soundsource_plugins:
                 plugins.append(x.get_abspath())
 
-	for x in mixxxminimal_plugins:
+        for x in mixxxminimal_plugins:
                 plugins.append(x.get_abspath())
 
         resource_map = {}
-        translation_files = Glob('#res/translations/*.qm')
         for tfile in translation_files:
                 resource_map[str(tfile)] = 'translations'
 
         qtdir = build.env['QTDIR']
-        qt_frameworks = depends.Qt.find_framework_path(qtdir)
+        qt_frameworks = depends.Qt.find_framework_libdir(qtdir, qt5)
         if not qt_frameworks:
                 raise Exception('Could not find frameworks in Qt directory: %s' % qtdir)
         #qt_menu.nib for Cocoa Qt 4.7+
@@ -374,8 +491,8 @@ if build.platform_is_osx and 'bundle' in COMMAND_LINE_TARGETS:
         sources = [mixxx_bin,
                    '#res/osx/application.icns',
                    Dir('#res/skins/'),
-                   File('#res/schema.xml'),
                    Dir('#res/controllers/'),
+                   Dir('#res/fonts/'),
                    translation_files,
                    Dir('#res/keyboard/'),
                    Dir('#res/doc/'),
@@ -398,11 +515,11 @@ if build.platform_is_osx and 'bundle' in COMMAND_LINE_TARGETS:
                 COPYRIGHT="Copyright © 2001-%s Mixxx Development Team" % datetime.datetime.now().year,
                 # WARNING(rjryan): If you change this, you must also change it
                 # in the build/osx/product_definition.plist.
-                MINIMUM_OSX_VERSION="10.6.0",
+                MINIMUM_OSX_VERSION="10.7.0",
                 CATEGORY="public.app-category.music",
                 OTOOL_LOCAL_PATHS=otool_local_paths,
                 OTOOL_SYSTEM_PATHS=otool_system_paths,
-                FOR_APP_STORE=True,
+                FOR_APP_STORE=int(build.flags['macappstore']) > 0,
                 )
         #env.Default(mixxx_bin) #todo: make the Default() just the program itself *globally* (not just for OS X); bundle should be a separate target
         env.Alias('bundle', bundle)
@@ -427,7 +544,8 @@ if build.platform_is_osx and 'bundle' in COMMAND_LINE_TARGETS:
         env.Alias('sign', codesign)
 
         package_name = 'mixxx'
-        package_version = osx_construct_version(build, mixxx_version, branch_name, vcs_revision)
+        package_version = construct_version(build, mixxx_version, branch_name,
+                                            vcs_revision)
         dmg_name = '%s-%s-%s' % (package_name, package_version, ARCH)
         dmg = env.Dmg(dmg_name, [bundle, ] + docs_files, VOLNAME=VOLNAME, ICON = DMG_ICON)
         env.Alias('package', dmg)
@@ -435,8 +553,8 @@ if build.platform_is_osx and 'bundle' in COMMAND_LINE_TARGETS:
 if build.platform_is_windows:
         base_dist_dir = '#' + dist_dir
         skins = env.Install(os.path.join(base_dist_dir, "skins"), skin_files)
-        resource = env.Install(base_dist_dir+"/", resource_files)
         controllermappings = env.Install(os.path.join(base_dist_dir, "controllers"), controllermappings_files)
+        fonts = env.Install(os.path.join(base_dist_dir, "fonts"), font_files)
         translations = env.Install(os.path.join(base_dist_dir, "translations"), translation_files)
         keyboardmappings = env.Install(os.path.join(base_dist_dir, "keyboard"), keyboardmappings_files)
         docs = env.Install(os.path.join(base_dist_dir, "doc/"), docs_files)
@@ -451,20 +569,25 @@ if build.platform_is_windows:
 
         #Always trigger these install builders when compiling on Windows
         env.Alias('mixxx', skins)
-        env.Alias('mixxx', resource)
         env.Alias('mixxx', controllermappings)
+        env.Alias('mixxx', fonts)
         env.Alias('mixxx', translations)
         env.Alias('mixxx', keyboardmappings)
         env.Alias('mixxx', promotracks)
         env.Alias('mixxx', docs)
         env.Alias('mixxx', dlls)
         env.Alias('mixxx', soundsource_plugins)
-	env.Alias('mixxx', vamp_plugins)
+        env.Alias('mixxx', vamp_plugins)
         #env.Alias('mixxx', icon)
         env.Alias('mixxx', binary)
 
+        # imageformats DLL
+        if imgfmtdll_files:
+                imageformats_dll = env.Install(os.path.join(base_dist_dir, "imageformats"), imgfmtdll_files)
+                env.Alias('mixxx', imageformats_dll)
+
         # QSQLite DLL
-        if 'sqldll_files' in locals():
+        if sqldll_files:
                 sql_dlls = env.Install(os.path.join(base_dist_dir, "sqldrivers"), sqldll_files)
                 env.Alias('mixxx', sql_dlls)
 
@@ -501,7 +624,7 @@ def BuildRelease(target, source, env):
     print
     print "You have built version %s" % mixxx_version
     print
-    if int(flags['msvcdebug']):
+    if build.build_is_debug:
         print "YOU ARE ABOUT TO PACKAGE A DEBUG BUILD!!"
         print
     print "Binary has size ",
@@ -513,8 +636,8 @@ def BuildRelease(target, source, env):
     print "Installer file ",
     package_name = 'mixxx'
 
-    package_version = windows_construct_version(
-        build, mixxx_version, branch_name, vcs_revision)
+    package_version = construct_version(build, mixxx_version, branch_name,
+                                        vcs_revision)
     arch = "x64" if build.machine_is_64bit else "x86"
     exe_name = '%s-%s-%s.exe' % (package_name, package_version, arch)
     print exe_name
@@ -533,43 +656,16 @@ def BuildRelease(target, source, env):
     print
     #if (raw_input("Go ahead and build installer (yes/[no])? ") == "yes"):
     if True:
+        # TODO(XXX): Installing a runtime isn't specific to MSVS?
         if build.toolchain_is_msvs:
             redist_file = 'vcredist_%s.exe' % arch
-            print "Searching for the Visual C++ DLL installer package",redist_file
-
-            # First check one level above the winlib directory
-            redist_path = '%s' % os.path.join(os.path.dirname(mixxx_winlib_path), redist_file)
-            print "   ",redist_path,
+            print "Searching for the Visual C++ DLL installer package", redist_file
+            # Check for the runtime installer in the winlib root.
+            redist_path = '%s' % os.path.join(mixxx_winlib_path, redist_file)
+            print "   ", redist_path,
             if not os.path.isfile(redist_path):
-                print "not found"
-                # If it's not there, look in the MS SDK directory
-                mssdk_path = util.get_mssdk_path()
-                #print "   Detected MS SDK path:", mssdk_path
-                redist_path = '%s' % os.path.join(mssdk_path,'Redist','VC',redist_file)
-                print "   ",redist_path,
-                if not os.path.isfile(redist_path):
-                    print "not found"
-                    raise Exception('Cannot find the Visual C++ DLL installer.')
+                raise Exception('Could not find the MSVC++ runtime installer.')
 
-            print "Extracting needed files..."
-            szip_path = None
-            try:
-                szip_directory = win32_find_program_via_registry("7-Zip")
-                szip_path = '%s' % os.path.join(szip_directory, "7z.exe")
-            except Exception, e:
-                pass
-            if szip_path is None:
-                print "Cannot find 7-Zip. Do you have it installed?"
-                raise Exception('Cannot find 7-Zip. Do you have it installed?')
-            else:
-                output_path = '%s' % os.path.join(mixxx_winlib_path,'VC_redist')
-                args = [szip_path,"x","-y","-ir!vc_red.*","-ir!*.msp",redist_path,"-o"+output_path]
-                print "Executing:", ' '.join(args)
-                proc = subprocess.Popen(args)
-                data, err = proc.communicate()
-                rv = proc.wait()
-                if rv:
-                    raise Exception('There was a problem extracting the installer files. See above for details.')
         print "Now building installation package..."
         command_flag = None
         nsis_path = None
@@ -590,7 +686,7 @@ def BuildRelease(target, source, env):
                 {'path': nsis_path,
                  'package_name': exe_name,
                  'version': mixxx_version,
-                 'qtpath': os.environ['QTDIR'],
+                 'qtpath': build.env['QTDIR'],
                  'winlibpath': mixxx_winlib_path,
                  '64bit': buildwin64}
             print "Using command: " + command
@@ -667,10 +763,10 @@ def BuildUbuntuPackage(target, source, env):
 
         ubuntu_distros = ubuntu_distros.split(',')
 
-        # Big hack for PPA upload. We need LP to believe that our original
+        # Big hack for beta PPA upload. We need LP to believe that our original
         # package version is always changing otherwise it will reject our orig
         # source tarball.
-        if ubuntu_ppa is not None:
+        if ubuntu_ppa and 'mixxxbetas' in ubuntu_ppa:
                 mixxx_version = '%s-%s%s' % (mixxx_version, vcs_name, vcs_revision)
 
         # Destroy ubuntu/ and create it
@@ -728,20 +824,40 @@ def BuildUbuntuPackage(target, source, env):
         print "* Copying Debian build directory from build/debian to debian (cwd: %s)" % os.getcwd()
         print
         os.system('cp -r build/debian .')
+        os.system('cp res/linux/mixxx.usb.rules ./debian/mixxx.mixxx-usb.udev')
+
+        scons_flags = ' '.join([
+                'optimize=portable',
+                'virtualize=0',
+                'mad=1',
+                'localecompare=1',
+                'qt_sqlite_plugin=0',
+                'build=' + build.build,
+                'qt5=%d' % qt5])
+
+        # Replace environment variables in the rules file.
+        # TODO(rryan) something more elegant? I don't know a better way. When
+        # Ubuntu build servers build us we don't get the chance to pass
+        # environment variables in.
+        with open('debian/rules', 'r') as fr:
+                rules = fr.read()
+                rules = rules.replace('MIXXX_SCONS_FLAGS = ""',
+                                      'MIXXX_SCONS_FLAGS = %s' % scons_flags)
+
+                with open('debian/rules', 'w') as fw:
+                        fw.write(rules)
 
         for ubuntu_distro in ubuntu_distros:
                 # if a control.$distro file exists, use it
                 if os.path.exists('debian/control.%s' % ubuntu_distro):
                         os.system('cp debian/control.%s debian/control' % ubuntu_distro)
-                # TODO(rryan) currently can only have version 1 within a distro
-                ubuntu_distro_version = '%s~%s1' % (ubuntu_version, ubuntu_distro)
                 package_version = ubuntu_construct_version(build, mixxx_version,
                                                            branch_name, vcs_revision,
-                                                           ubuntu_distro_version)
+                                                           ubuntu_version, ubuntu_distro)
 
                 # Add a changelog record for this package
                 if build.build_is_debug:
-                        description = "  * Experimental build of branch '%s' at Bazaar revision %s" % (branch_name, vcs_revision)
+                        description = "  * Experimental build of branch '%s' at revision %s" % (branch_name, vcs_revision)
                         ubuntu_append_changelog('debian', package_name, package_version,
                                                 description, distro=ubuntu_distro)
                 else:
@@ -755,13 +871,15 @@ def BuildUbuntuPackage(target, source, env):
                 print "* Starting pbuilder ...  (cwd: %s)" % os.getcwd()
                 print
 
-                command = ["ARCH=%s" % arch,
-                           "DIST=%s" % ubuntu_distro]
+                command = ['MIXXX_SCONS_FLAGS="%s"' % scons_flags,
+                           'ARCH=%s' % arch,
+                           'DIST=%s' % ubuntu_distro]
 
                 if package_target == 'source':
                         # TODO(rryan) we have to figure out the key-signing situation
                         # here.
-                        command.extend(['debuild', '-S', '-sa'])
+                        # Preserve the MIXXX_SCONS_FLAGS environment variable.
+                        command.extend(['debuild', '-eMIXXX_SCONS_FLAGS', '-S', '-sa',])
                 else:
                         command.extend(['pdebuild'])
                 result = os.system(' '.join(command))
@@ -778,17 +896,35 @@ def BuildUbuntuPackage(target, source, env):
                         result_path = "/var/cache/pbuilder/%s-%s/result/" % (ubuntu_distro, arch)
                         result_filename = "%s_%s_%s.deb" % (package_name, package_version, arch)
                         result_file = os.path.join(result_path, result_filename)
+
                         # Since we might build for multiple distros we need to
                         # insert the distro name into the filename.
-                        dest_filename = "%s_%s_%s_%s.deb" % (package_name, package_version, ubuntu_distro, arch)
+                        # HACK(rryan): filenames for Ubuntu packaging in general
+                        # are a big mess but we only distribute files in this
+                        # code path (package_target != 'source') via
+                        # downloads.mixxx.org so we may as well make the
+                        # filenames match the Windows/OSX builds.
+                        version = construct_version(build, mixxx_version,
+                                                    branch_name, vcs_revision)
+                        dest_filename = '-'.join((package_name, version,
+                                                  ubuntu_distro, arch))
+                        dest_deb_filename = "%s.deb" % dest_filename
+                        # Also rename the source tarball.
+                        dest_tar_filename = "%s.tar.gz" % dest_filename
+
                         # ubuntu/ is one folder up
-                        dest_file = os.path.join('..', dest_filename)
+                        dest_deb_file = os.path.join('..', dest_deb_filename)
+                        dest_tar_file = os.path.join('..', dest_tar_filename)
+
+                        source_tar_file = os.path.join('..', mixxx_tarball)
+                        if os.path.exists(source_tar_file):
+                                shutil.move(source_tar_file, dest_tar_file)
 
                         if result == 0 and os.path.exists(result_file):
                                 print "Done! Package and tarballs are in %s" % result_path
-                                print "* Found package at '%s'. Copying to ubuntu/" % result_filename
+                                print "* Found package at '%s'. Copying to ubuntu/" % result_file
                                 print
-                                shutil.copyfile(result_file, dest_file)
+                                shutil.copyfile(result_file, dest_deb_file)
                         else:
                                 print "* Build failed."
                                 print

@@ -14,19 +14,19 @@ class SelectorSimilarity : public QObject {
   public:
     SelectorSimilarity(QObject *parent,
                        TrackCollection* pTrackCollection,
-                       ConfigObject<ConfigValue>* pConfig,
+                       UserSettingsPointer pConfig,
                        SelectorFilters& selectorFilters);
     ~SelectorSimilarity();
 
     struct ScorePair {
-        ScorePair (int id, double similarityScore)
+        ScorePair (TrackId id, double similarityScore)
         : trackId(id), score(similarityScore) {}
-        int trackId;
+        TrackId trackId;
         double score;
     };
 
-    QList<ScorePair> calculateSimilarities(int iSeedTrackId,
-                                           QList<int> trackIds);
+    QList<ScorePair> calculateSimilarities(TrackId iSeedTrackId,
+                                           QList<TrackId> trackIds);
     // compare two tracks using every similarity function; used
     // for similarity diagnostics
     QHash<QString, double> compareTracks(TrackPointer pTrack1,
@@ -36,8 +36,8 @@ class SelectorSimilarity : public QObject {
   public slots:
     // Return up to n followup tracks for a given seed track, filtered and ranked
     // according to current settings. (n defaults to -1, which returns all results.)
-    QList<int> getFollowupTracks(int iSeedTrackId, int n = -1);
-    int getTopFollowupTrack(int iSeedTrackId);
+    QList<TrackId> getFollowupTracks(TrackId iSeedTrackId, int n = -1);
+    TrackId getTopFollowupTrack(TrackId iSeedTrackId);
     void setSimilarityContributions(const QHash<QString, double>& contributions);
 
   private:
@@ -47,7 +47,7 @@ class SelectorSimilarity : public QObject {
     static bool similaritySort(const ScorePair s1,
                                const ScorePair s2);
 
-    ConfigObject<ConfigValue>* m_pConfig;
+    UserSettingsPointer m_pConfig;
     TrackCollection* m_pTrackCollection;
     QSqlDatabase& m_database;
     TrackDAO& m_trackDAO;

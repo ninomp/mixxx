@@ -1,11 +1,12 @@
-#include <QtDebug>
-
 #include "effects/native/echoeffect.h"
 
-#include "sampleutil.h"
+#include <QtDebug>
+
+#include "util/sample.h"
 
 #define INCREMENT_RING(index, increment, length) index = (index + increment) % length
 #define RAMP_LENGTH 500
+#define CHANNEL_COUNT 2
 
 // static
 QString EchoEffect::getId() {
@@ -27,7 +28,6 @@ EffectManifest EchoEffect::getManifest() {
     time->setDescription(
             QObject::tr("How much of the signal to send into the delay buffer"));
     time->setControlHint(EffectManifestParameter::CONTROL_KNOB_LINEAR);
-    time->setValueHint(EffectManifestParameter::VALUE_FLOAT);
     time->setSemanticHint(EffectManifestParameter::SEMANTIC_UNKNOWN);
     time->setUnitsHint(EffectManifestParameter::UNITS_UNKNOWN);
     time->setMinimum(0.0);
@@ -39,10 +39,9 @@ EffectManifest EchoEffect::getManifest() {
     time->setName(QObject::tr("Delay"));
     time->setDescription(QObject::tr("Delay time (seconds)"));
     time->setControlHint(EffectManifestParameter::CONTROL_KNOB_LINEAR);
-    time->setValueHint(EffectManifestParameter::VALUE_FLOAT);
     time->setSemanticHint(EffectManifestParameter::SEMANTIC_UNKNOWN);
     time->setUnitsHint(EffectManifestParameter::UNITS_TIME);
-    time->setLinkHint(EffectManifestParameter::LINK_LINKED);
+    time->setDefaultLinkType(EffectManifestParameter::LINK_LINKED);
     time->setMinimum(0.1);
     time->setDefault(0.25);
     time->setMaximum(2.0);
@@ -53,7 +52,6 @@ EffectManifest EchoEffect::getManifest() {
     time->setDescription(
             QObject::tr("Amount the echo fades each time it loops"));
     time->setControlHint(EffectManifestParameter::CONTROL_KNOB_LOGARITHMIC);
-    time->setValueHint(EffectManifestParameter::VALUE_FLOAT);
     time->setSemanticHint(EffectManifestParameter::SEMANTIC_UNKNOWN);
     time->setUnitsHint(EffectManifestParameter::UNITS_UNKNOWN);
     time->setMinimum(0.00);
@@ -68,7 +66,6 @@ EffectManifest EchoEffect::getManifest() {
                         "of the echoed signal is bounced between the left and "
                         "right speakers."));
     time->setControlHint(EffectManifestParameter::CONTROL_KNOB_LINEAR);
-    time->setValueHint(EffectManifestParameter::VALUE_FLOAT);
     time->setSemanticHint(EffectManifestParameter::SEMANTIC_UNKNOWN);
     time->setUnitsHint(EffectManifestParameter::UNITS_UNKNOWN);
     time->setMinimum(0.0);
@@ -91,10 +88,7 @@ EchoEffect::~EchoEffect() {
 }
 
 int EchoEffect::getDelaySamples(double delay_time, const unsigned int sampleRate) const {
-    int delay_samples = delay_time * sampleRate;
-    if (delay_samples % 2 == 1) {
-        --delay_samples;
-    }
+    int delay_samples = CHANNEL_COUNT * delay_time * sampleRate;
     if (delay_samples > static_cast<int>(MAX_BUFFER_LEN)) {
         qWarning() << "Delay buffer requested is larger than max buffer!";
         delay_samples = static_cast<int>(MAX_BUFFER_LEN);
@@ -102,22 +96,21 @@ int EchoEffect::getDelaySamples(double delay_time, const unsigned int sampleRate
     return delay_samples;
 }
 
-void EchoEffect::processGroup(const QString& group, EchoGroupState* pGroupState,
-                              const CSAMPLE* pInput,
-                              CSAMPLE* pOutput, const unsigned int numSamples,
-                              const unsigned int sampleRate,
-                              const GroupFeatureState& groupFeatures) {
-    Q_UNUSED(group);
+void EchoEffect::processChannel(const ChannelHandle& handle, EchoGroupState* pGroupState,
+                                const CSAMPLE* pInput,
+                                CSAMPLE* pOutput, const unsigned int numSamples,
+                                const unsigned int sampleRate,
+                                const EffectProcessor::EnableState enableState,
+                                const GroupFeatureState& groupFeatures) {
+    Q_UNUSED(handle);
+    Q_UNUSED(enableState);
     Q_UNUSED(groupFeatures);
+    DEBUG_ASSERT(0 == (numSamples % CHANNEL_COUNT));
     EchoGroupState& gs = *pGroupState;
-    double delay_time =
-            m_pDelayParameter ? m_pDelayParameter->value().toDouble() : 1.0f;
-    double send_amount =
-            m_pSendParameter ? m_pSendParameter->value().toDouble() : 1.0f;
-    double feedback_amount =
-            m_pFeedbackParameter ? m_pFeedbackParameter->value().toDouble() : 0.25f;
-    double pingpong_frac =
-            m_pPingPongParameter ? m_pPingPongParameter->value().toDouble() : 0.25f;
+    double delay_time = m_pDelayParameter->value();
+    double send_amount = m_pSendParameter->value();
+    double feedback_amount = m_pFeedbackParameter->value();
+    double pingpong_frac = m_pPingPongParameter->value();
 
     // TODO(owilliams): get actual sample rate from somewhere.
 
@@ -140,7 +133,7 @@ void EchoEffect::processGroup(const QString& group, EchoGroupState* pGroupState,
     gs.prev_delay_samples = delay_samples;
 
     // Feedback the delay buffer and then add the new input.
-    for (unsigned int i = 0; i < numSamples; i += 2) {
+    for (unsigned int i = 0; i < numSamples; i += CHANNEL_COUNT) {
         // Ramp the beginning and end of the delay buffer to prevent clicks.
         double write_ramper = 1.0;
         if (gs.write_position < RAMP_LENGTH) {
@@ -158,12 +151,12 @@ void EchoEffect::processGroup(const QString& group, EchoGroupState* pGroupState,
                 SampleUtil::clampSample(gs.delay_buf[gs.write_position]);
         gs.delay_buf[gs.write_position + 1] =
                 SampleUtil::clampSample(gs.delay_buf[gs.write_position + 1]);
-        INCREMENT_RING(gs.write_position, 2, delay_samples);
+        INCREMENT_RING(gs.write_position, CHANNEL_COUNT, delay_samples);
     }
 
     // Pingpong the output.  If the pingpong value is zero, all of the
     // math below should result in a simple copy of delay buf to pOutput.
-    for (unsigned int i = 0; i + 1 < numSamples; i += 2) {
+    for (unsigned int i = 0; i < numSamples; i += CHANNEL_COUNT) {
         if (gs.ping_pong_left) {
             // Left sample plus a fraction of the right sample, normalized
             // by 1 + fraction.
@@ -186,7 +179,7 @@ void EchoEffect::processGroup(const QString& group, EchoGroupState* pGroupState,
                     (1 + pingpong_frac)) / 2.0;
         }
 
-        INCREMENT_RING(read_position, 2, delay_samples);
+        INCREMENT_RING(read_position, CHANNEL_COUNT, delay_samples);
         // If the buffer has looped around, flip-flop the ping-pong.
         if (read_position == 0) {
             gs.ping_pong_left = !gs.ping_pong_left;

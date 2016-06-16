@@ -18,12 +18,11 @@ Timbre::Timbre(const TimbreModel& timbreModel)
 Timbre::~Timbre() {
 }
 
-QByteArray* Timbre::toByteArray() const {
+QByteArray Timbre::toByteArray() const {
     QMutexLocker locker(&m_mutex);
     std::string output;
     m_timbreModel.SerializeToString(&output);
-    QByteArray* pByteArray = new QByteArray(output.data(), output.length());
-    return pByteArray;
+    return QByteArray(output.data(), output.length());
 }
 
 QString Timbre::getVersion() const {

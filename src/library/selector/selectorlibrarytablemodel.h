@@ -13,13 +13,13 @@
 
 #define SELECTOR_TABLE "selector_table"
 
-class ControlObjectThread;
+class ControlProxy;
 
 class SelectorLibraryTableModel : public LibraryTableModel {
     Q_OBJECT
   public:
     SelectorLibraryTableModel(QObject* parent,
-                              ConfigObject<ConfigValue>* pConfig,
+                              UserSettingsPointer pConfig,
                               TrackCollection* pTrackCollection);
     ~SelectorLibraryTableModel();
 
@@ -68,9 +68,9 @@ class SelectorLibraryTableModel : public LibraryTableModel {
     QString m_filterString;
     TrackPointer m_pSeedTrack;
     TrackPointer m_pLoadedTrack;
-    ControlObjectThread* m_channelBpm;
-    ControlObjectThread* m_channelKey;
-    ConfigObject<ConfigValue>* m_pConfig;
+    ControlProxy* m_channelBpm;
+    ControlProxy* m_channelKey;
+    UserSettingsPointer m_pConfig;
     SelectorFilters m_selectorFilters;
     SelectorSimilarity m_selectorSimilarity;
 };

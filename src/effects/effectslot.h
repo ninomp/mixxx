@@ -5,34 +5,24 @@
 #include <QSharedPointer>
 #include <QString>
 
-#include "util.h"
-#include "controlobject.h"
-#include "controlpushbutton.h"
+#include "control/controlobject.h"
+#include "control/controlpushbutton.h"
 #include "effects/effect.h"
 #include "effects/effectparameterslot.h"
 #include "effects/effectbuttonparameterslot.h"
+#include "util/class.h"
 
 class EffectSlot;
-class ControlObjectSlave;
+class ControlProxy;
 typedef QSharedPointer<EffectSlot> EffectSlotPointer;
 
 class EffectSlot : public QObject {
     Q_OBJECT
   public:
-    EffectSlot(const unsigned int iRackNumber,
+    EffectSlot(const QString& group,
                const unsigned int iChainNumber,
                const unsigned int iEffectNumber);
     virtual ~EffectSlot();
-
-    static QString formatGroupString(const unsigned int iRackNumber,
-                                     const unsigned int iChainNumber,
-                                     const unsigned int iEffectNumber) {
-        return QString("[EffectRack%1_EffectUnit%2_Effect%3]").arg(
-            QString::number(iRackNumber+1),
-            QString::number(iChainNumber+1),
-            QString::number(iEffectNumber+1));
-
-    }
 
     // Return the currently loaded effect, if any. If no effect is loaded,
     // returns a null EffectPointer.
@@ -46,7 +36,18 @@ class EffectSlot : public QObject {
     EffectButtonParameterSlotPointer addEffectButtonParameterSlot();
     EffectButtonParameterSlotPointer getEffectButtonParameterSlot(unsigned int slotNumber);
 
-    void onChainParameterChanged(double parameter);
+    void onChainSuperParameterChanged(double parameter, bool force=false);
+
+    // ensures that Softtakover is bypassed for the following
+    // ChainParameterChange. Uses for testing only
+    void syncSofttakeover();
+
+    // Unload the currently loaded effect
+    void clear();
+
+    const QString& getGroup() const {
+        return m_group;
+    }
 
   public slots:
     // Request that this EffectSlot load the given Effect
@@ -81,20 +82,15 @@ class EffectSlot : public QObject {
 
     // Signal that whoever is in charge of this EffectSlot should clear this
     // EffectSlot (by deleting the effect from the underlying chain).
-    void clearEffect(unsigned int iChainNumber, unsigned int iEffectNumber,
-                     EffectPointer pEffect);
+    void clearEffect(unsigned int iEffectNumber);
 
     void updated();
 
   private:
     QString debugString() const {
-        return QString("EffectSlot(%1,%2)").arg(m_iChainNumber).arg(m_iEffectNumber);
+        return QString("EffectSlot(%1)").arg(m_group);
     }
 
-    // Unload the currently loaded effect
-    void clear();
-
-    const unsigned int m_iRackNumber;
     const unsigned int m_iChainNumber;
     const unsigned int m_iEffectNumber;
     const QString m_group;
@@ -111,7 +107,6 @@ class EffectSlot : public QObject {
     ControlObject* m_pControlEffectSelector;
     ControlObject* m_pControlClear;
     QList<EffectParameterSlotPointer> m_parameters;
-    ControlObjectSlave* m_pCoSuper;
     QList<EffectButtonParameterSlotPointer> m_buttonParameters;
 
     DISALLOW_COPY_AND_ASSIGN(EffectSlot);

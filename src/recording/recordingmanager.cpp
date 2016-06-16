@@ -4,14 +4,16 @@
 #include <QDir>
 #include <QtDebug>
 
-#include "recording/recordingmanager.h"
-#include "recording/defs_recording.h"
-#include "engine/sidechain/enginesidechain.h"
-#include "engine/sidechain/enginerecord.h"
-#include "controlpushbutton.h"
+#include "control/controlproxy.h"
+#include "control/controlpushbutton.h"
 #include "engine/enginemaster.h"
+#include "engine/sidechain/enginerecord.h"
+#include "engine/sidechain/enginesidechain.h"
+#include "errordialoghandler.h"
+#include "recording/defs_recording.h"
+#include "recording/recordingmanager.h"
 
-RecordingManager::RecordingManager(ConfigObject<ConfigValue>* pConfig, EngineMaster* pEngine)
+RecordingManager::RecordingManager(UserSettingsPointer pConfig, EngineMaster* pEngine)
         : m_pConfig(pConfig),
           m_recordingDir(""),
           m_recording_base_file(""),
@@ -26,7 +28,7 @@ RecordingManager::RecordingManager(ConfigObject<ConfigValue>* pConfig, EngineMas
     connect(m_pToggleRecording, SIGNAL(valueChanged(double)),
             this, SLOT(slotToggleRecording(double)));
     m_recReadyCO = new ControlObject(ConfigKey(RECORDING_PREF_KEY, "status"));
-    m_recReady = new ControlObjectThread(m_recReadyCO->getKey());
+    m_recReady = new ControlProxy(m_recReadyCO->getKey(), this);
 
     m_split_size = getFileSplitSize();
 
@@ -35,8 +37,8 @@ RecordingManager::RecordingManager(ConfigObject<ConfigValue>* pConfig, EngineMas
     EngineSideChain* pSidechain = pEngine->getSideChain();
     if (pSidechain) {
         EngineRecord* pEngineRecord = new EngineRecord(m_pConfig);
-        connect(pEngineRecord, SIGNAL(isRecording(bool)),
-                this, SLOT(slotIsRecording(bool)));
+        connect(pEngineRecord, SIGNAL(isRecording(bool, bool)),
+                this, SLOT(slotIsRecording(bool, bool)));
         connect(pEngineRecord, SIGNAL(bytesRecorded(int)),
                 this, SLOT(slotBytesRecorded(int)));
         connect(pEngineRecord, SIGNAL(durationRecorded(QString)),
@@ -45,11 +47,9 @@ RecordingManager::RecordingManager(ConfigObject<ConfigValue>* pConfig, EngineMas
     }
 }
 
-RecordingManager::~RecordingManager()
-{
+RecordingManager::~RecordingManager() {
     qDebug() << "Delete RecordingManager";
 
-    delete m_recReady;
     delete m_recReadyCO;
     delete m_pToggleRecording;
 }
@@ -110,13 +110,13 @@ void RecordingManager::startRecording(bool generateFileName) {
         m_pConfig->set(ConfigKey(RECORDING_PREF_KEY, "CuePath"), new_base_filename +".cue");
         m_recordingFile = QFileInfo(m_recordingLocation).fileName();
     }
-    m_recReady->slotSet(RECORD_READY);
+    m_recReady->set(RECORD_READY);
 }
 
 void RecordingManager::stopRecording()
 {
     qDebug() << "Recording stopped";
-    m_recReady->slotSet(RECORD_OFF);
+    m_recReady->set(RECORD_OFF);
     m_recordingFile = "";
     m_recordingLocation = "";
     m_iNumberOfBytesRecorded = 0;
@@ -169,13 +169,23 @@ void RecordingManager::slotBytesRecorded(int bytes)
     emit(bytesRecorded(m_iNumberOfBytesRecorded));
 }
 
-void RecordingManager::slotIsRecording(bool isRecordingActive)
-{
-    //qDebug() << "SlotIsRecording " << isRecording;
+void RecordingManager::slotIsRecording(bool isRecordingActive, bool error) {
+    //qDebug() << "SlotIsRecording " << isRecording << error;
 
     // Notify the GUI controls, see dlgrecording.cpp.
     m_bRecording = isRecordingActive;
     emit(isRecording(isRecordingActive));
+
+    if (error) {
+        ErrorDialogProperties* props = ErrorDialogHandler::instance()->newDialogProperties();
+        props->setType(DLG_WARNING);
+        props->setTitle(tr("Recording"));
+        props->setText("<html>"+tr("Could not create audio file for recording!")
+                       +"<p>"+tr("Ensure there is enough free disk space and you have write permission for the Recordings folder.")
+                       +"<p>"+tr("You can change the location of the Recordings folder in Preferences > Recording.")
+                       +"</p></html>");
+        ErrorDialogHandler::instance()->requestErrorDialog(props);
+    }
 }
 
 bool RecordingManager::isRecordingActive() {

@@ -22,13 +22,14 @@
 #include <QAtomicInt>
 #include <gtest/gtest_prod.h>
 
-#include "util/types.h"
+#include "engine/cachingreader.h"
+#include "preferences/usersettings.h"
+#include "control/controlvalue.h"
 #include "engine/engineobject.h"
 #include "engine/sync/syncable.h"
-#include "trackinfoobject.h"
-#include "configobject.h"
-#include "rotary.h"
-#include "control/controlvalue.h"
+#include "track/track.h"
+#include "util/rotary.h"
+#include "util/types.h"
 
 //for the writer
 #ifdef __SCALER_DEBUG__
@@ -48,16 +49,13 @@ class ClockControl;
 class CueControl;
 class ReadAheadManager;
 class ControlObject;
-class ControlObjectSlave;
+class ControlProxy;
 class ControlPushButton;
 class ControlIndicator;
-class ControlObjectThreadMain;
 class ControlBeat;
 class ControlTTRotary;
 class ControlPotmeter;
-class CachingReader;
 class EngineBufferScale;
-class EngineBufferScaleDummy;
 class EngineBufferScaleLinear;
 class EngineBufferScaleST;
 class EngineBufferScaleRubberBand;
@@ -65,8 +63,6 @@ class EngineSync;
 class EngineWorkerScheduler;
 class VisualPlayPosition;
 class EngineMaster;
-
-struct Hint;
 
 /**
   *@author Tue and Ken Haste Andersen
@@ -106,11 +102,12 @@ class EngineBuffer : public EngineObject {
     };
   public:
     enum SeekRequest {
-        NO_SEEK,
-        SEEK_STANDARD,
-        SEEK_EXACT,
-        SEEK_PHASE
+        SEEK_NONE = 0x00,
+        SEEK_PHASE = 0x01,
+        SEEK_EXACT = 0x02,
+        SEEK_STANDARD = 0x03, // = (SEEK_EXACT | SEEK_PHASE)
     };
+    Q_DECLARE_FLAGS(SeekRequests, SeekRequest);
 
     enum KeylockEngine {
         SOUNDTOUCH,
@@ -118,25 +115,23 @@ class EngineBuffer : public EngineObject {
         KEYLOCK_ENGINE_COUNT,
     };
 
-    EngineBuffer(const char* _group, ConfigObject<ConfigValue>* _config,
+    EngineBuffer(QString _group, UserSettingsPointer pConfig,
                  EngineChannel* pChannel, EngineMaster* pMixingEngine);
     virtual ~EngineBuffer();
-    bool getPitchIndpTimeStretch(void);
 
     void bindWorkers(EngineWorkerScheduler* pWorkerScheduler);
 
-    // Add an engine control to the EngineBuffer
-    void addControl(EngineControl* pControl);
-
     // Return the current rate (not thread-safe)
     double getSpeed();
+    bool getScratching();
     // Returns current bpm value (not thread-safe)
     double getBpm();
-    // Returns the BPM of the loaded track (not thread-safe)
-    double getFileBpm();
+    // Returns the BPM of the loaded track around the current position (not thread-safe)
+    double getLocalBpm();
     // Sets pointer to other engine buffer/channel
     void setEngineMaster(EngineMaster*);
 
+    // Queues a new seek position. Use SEEK_EXACT or SEEK_STANDARD as seekType
     void queueNewPlaypos(double newpos, enum SeekRequest seekType);
     void requestSyncPhase();
     void requestEnableSync(bool enabled);
@@ -147,7 +142,7 @@ class EngineBuffer : public EngineObject {
     void processSlip(int iBufferSize);
     void postProcess(const int iBufferSize);
 
-    const char* getGroup();
+    QString getGroup();
     bool isTrackLoaded();
     TrackPointer getLoadedTrack() const;
 
@@ -160,10 +155,11 @@ class EngineBuffer : public EngineObject {
     //void setReader(CachingReader* pReader);
 
     // For dependency injection of scalers.
-    void setScalerForTest(EngineBufferScale* pScale);
+    void setScalerForTest(EngineBufferScale* pScaleVinyl,
+                          EngineBufferScale* pScaleKeylock);
 
-    // For dependency injection of fake tracks.
-    TrackPointer loadFakeTrack();
+    // For dependency injection of fake tracks, with an optional filebpm value.
+    TrackPointer loadFakeTrack(double filebpm = 0);
 
     static QString getKeylockEngineName(KeylockEngine engine) {
         switch (engine) {
@@ -175,6 +171,11 @@ class EngineBuffer : public EngineObject {
             return tr("Unknown (bad value)");
         }
     }
+
+    // Request that the EngineBuffer load a track. Since the process is
+    // asynchronous, EngineBuffer will emit a trackLoaded signal when the load
+    // has completed.
+    void loadTrack(TrackPointer pTrack, bool play);
 
   public slots:
     void slotControlPlayRequest(double);
@@ -189,17 +190,11 @@ class EngineBuffer : public EngineObject {
     void slotControlSlip(double);
     void slotKeylockEngineChanged(double);
 
-    // Request that the EngineBuffer load a track. Since the process is
-    // asynchronous, EngineBuffer will emit a trackLoaded signal when the load
-    // has completed.
-    void slotLoadTrack(TrackPointer pTrack, bool play = false);
-
     void slotEjectTrack(double);
 
   signals:
-    void trackLoaded(TrackPointer pTrack);
+    void trackLoaded(TrackPointer pNewTrack, TrackPointer pOldTrack);
     void trackLoadFailed(TrackPointer pTrack, QString reason);
-    void trackUnloaded(TrackPointer pTrack);
 
   private slots:
     void slotTrackLoading();
@@ -211,7 +206,12 @@ class EngineBuffer : public EngineObject {
     void slotPassthroughChanged(double v);
 
   private:
-    void enablePitchAndTimeScaling(bool bEnable);
+    // Add an engine control to the EngineBuffer
+    // must not be called outside the Constructor
+    void addControl(EngineControl* pControl);
+
+    void enableIndependentPitchTempoScaling(bool bEnable,
+                                            const int iBufferSize);
 
     void updateIndicators(double rate, int iBufferSize);
 
@@ -221,33 +221,36 @@ class EngineBuffer : public EngineObject {
 
     double fractionalPlayposFromAbsolute(double absolutePlaypos);
 
-    void doSeek(double change, enum SeekRequest seekType);
+    void doSeekFractional(double fractionalPos, enum SeekRequest seekType);
+    void doSeekPlayPos(double playpos, enum SeekRequest seekType);
 
-    void clearScale();
+    // Read one buffer from the current scaler into the crossfade buffer.  Used
+    // for transitioning from one scaler to another, or reseeking a scaler
+    // to prevent pops.
+    void readToCrossfadeBuffer(const int iBufferSize);
 
     // Reset buffer playpos and set file playpos.
     void setNewPlaypos(double playpos);
 
     void processSyncRequests();
-    void processSeek();
+    void processSeek(bool paused);
 
-    double updateIndicatorsAndModifyPlay(double v);
+    bool updateIndicatorsAndModifyPlay(bool newPlay);
     void verifyPlay();
 
-    // Lock for modifying local engine variables that are not thread safe, such
-    // as m_engineControls and m_hintList
-    QMutex m_engineLock;
-
     // Holds the name of the control group
-    const char* m_group;
-    ConfigObject<ConfigValue>* m_pConfig;
+    QString m_group;
+    UserSettingsPointer m_pConfig;
 
     LoopingControl* m_pLoopingControl;
     FRIEND_TEST(LoopingControlTest, LoopHalveButton_HalvesLoop);
     FRIEND_TEST(LoopingControlTest, LoopMoveTest);
+    FRIEND_TEST(LoopingControlTest, LoopResizeSeek);
     FRIEND_TEST(SyncControlTest, TestDetermineBpmMultiplier);
     FRIEND_TEST(EngineSyncTest, HalfDoubleBpmTest);
     FRIEND_TEST(EngineSyncTest, HalfDoubleThenPlay);
+    FRIEND_TEST(EngineSyncTest, UserTweakBeatDistance);
+    FRIEND_TEST(EngineBufferTest, ScalerNoTransport);
     EngineSync* m_pEngineSync;
     SyncControl* m_pSyncControl;
     VinylControlControl* m_pVinylControlControl;
@@ -266,7 +269,7 @@ class EngineBuffer : public EngineObject {
     CachingReader* m_pReader;
 
     // List of hints to provide to the CachingReader
-    QVector<Hint> m_hintList;
+    HintVector m_hintList;
 
     // The current sample to play in the file.
     double m_filepos_play;
@@ -277,6 +280,9 @@ class EngineBuffer : public EngineObject {
 
     // True if the previous callback was scratching.
     bool m_scratching_old;
+
+    // True if the previous callback was reverse.
+    bool m_reverse_old;
 
     // The previous callback's pitch. Used to check if the scaler parameters
     // need updating.
@@ -290,10 +296,10 @@ class EngineBuffer : public EngineObject {
     double m_rate_old;
 
     // Copy of length of file
-    long int m_file_length_old;
+    int m_trackSamplesOld;
 
     // Copy of file sample rate
-    int m_file_srate_old;
+    int m_trackSampleRateOld;
 
     // Mutex controlling weather the process function is in pause mode. This happens
     // during seek and loading of a new track
@@ -310,8 +316,6 @@ class EngineBuffer : public EngineObject {
     QAtomicInt m_slipEnabled;
     // m_bSlipEnabledProcessing is only used by the engine processing thread.
     bool m_bSlipEnabledProcessing;
-    bool m_bWasKeylocked;
-
 
     ControlObject* m_pTrackSamples;
     ControlObject* m_pTrackSampleRate;
@@ -325,17 +329,19 @@ class EngineBuffer : public EngineObject {
     ControlObject* m_backButton;
     ControlPushButton* m_pSlipButton;
 
-    ControlObject* m_rateEngine;
     ControlObject* m_visualBpm;
     ControlObject* m_visualKey;
     ControlObject* m_pQuantize;
     ControlObject* m_pMasterRate;
     ControlPotmeter* m_playposSlider;
-    ControlObjectSlave* m_pSampleRate;
-    ControlObjectSlave* m_pKeylockEngine;
-    ControlObjectSlave* m_pPitchControl;
+    ControlProxy* m_pSampleRate;
+    ControlProxy* m_pKeylockEngine;
     ControlPushButton* m_pKeylock;
-    QScopedPointer<ControlObjectSlave> m_pPassthroughEnabled;
+
+    // This ControlProxys is created as parent to this and deleted by
+    // the Qt object tree. This helps that they are deleted by the creating
+    // thread, which is required to avoid segfaults.
+    ControlProxy* m_pPassthroughEnabled;
 
     ControlPushButton* m_pEject;
 
@@ -346,26 +352,34 @@ class EngineBuffer : public EngineObject {
     ControlPushButton* m_startButton;
     ControlPushButton* m_endButton;
 
-    // Object used to perform waveform scaling (sample rate conversion)
+    // Object used to perform waveform scaling (sample rate conversion).  These
+    // three pointers may be reassigned depending on configuration and tests.
     EngineBufferScale* m_pScale;
-    // Object used for linear interpolation scaling of the audio
-    EngineBufferScaleLinear* m_pScaleLinear;
-    // Object used for pitch-indep time stretch (key lock) scaling of the audio
-    EngineBufferScaleST* m_pScaleST;
-    EngineBufferScaleRubberBand* m_pScaleRB;
+    FRIEND_TEST(EngineBufferTest, SlowRubberBand);
+    FRIEND_TEST(EngineBufferTest, ResetPitchAdjustUsesLinear);
+    FRIEND_TEST(EngineBufferTest, VinylScalerRampZero);
+    FRIEND_TEST(EngineBufferTest, ReadFadeOut);
+    EngineBufferScale* m_pScaleVinyl;
     // The keylock engine is configurable, so it could flip flop between
     // ScaleST and ScaleRB during a single callback.
     EngineBufferScale* volatile m_pScaleKeylock;
-    EngineBufferScaleDummy* m_pScaleDummy;
+
+    // Object used for vinyl-style interpolation scaling of the audio
+    EngineBufferScaleLinear* m_pScaleLinear;
+    // Objects used for pitch-indep time stretch (key lock) scaling of the audio
+    EngineBufferScaleST* m_pScaleST;
+    EngineBufferScaleRubberBand* m_pScaleRB;
+
     // Indicates whether the scaler has changed since the last process()
     bool m_bScalerChanged;
     // Indicates that dependency injection has taken place.
     bool m_bScalerOverride;
 
     QAtomicInt m_iSeekQueued;
+    QAtomicInt m_iSeekPhaseQueued;
     QAtomicInt m_iEnableSyncQueued;
     QAtomicInt m_iSyncModeQueued;
-    ControlValueAtomic<double> m_queuedPosition;
+    ControlValueAtomic<double> m_queuedSeekPosition;
 
     // Holds the last sample value of the previous buffer. This is used when ramping to
     // zero in case of an immediate stop of the playback
@@ -376,7 +390,9 @@ class EngineBuffer : public EngineObject {
     bool m_bPlayAfterLoading;
     float m_fRampValue;
     int m_iRampState;
-    //int m_iRampIter;
+    // Records the sample rate so we can detect when it changes. Initialized to
+    // 0 to guarantee we see a change on the first callback.
+    int m_iSampleRate;
 
     TrackPointer m_pCurrentTrack;
 #ifdef __SCALER_DEBUG__
@@ -385,11 +401,16 @@ class EngineBuffer : public EngineObject {
 #endif
     CSAMPLE* m_pDitherBuffer;
     unsigned int m_iDitherBufferReadIndex;
-    CSAMPLE* m_pCrossFadeBuffer;
-    int m_iCrossFadeSamples;
+
+    // Certain operations like seeks and engine changes need to be crossfaded
+    // to eliminate clicks and pops.
+    CSAMPLE* m_pCrossfadeBuffer;
+    bool m_bCrossfadeReady;
     int m_iLastBufferSize;
 
     QSharedPointer<VisualPlayPosition> m_visualPlayPos;
 };
+
+Q_DECLARE_OPERATORS_FOR_FLAGS(EngineBuffer::SeekRequests)
 
 #endif

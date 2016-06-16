@@ -18,13 +18,16 @@ typedef QSharedPointer<Timbre> TimbrePointer;
 class Timbre : public QObject {
     Q_OBJECT
   public:
-    explicit Timbre(const QByteArray* pByteArray=NULL);
+    explicit Timbre(const QByteArray* pByteArray=nullptr);
     ~Timbre();
-    QByteArray* toByteArray() const;
+
+    QByteArray toByteArray() const;
+
     QString getVersion() const;
     QString getSubVersion() const;
     void setSubVersion(QString subVersion);
     const mixxx::track::io::timbre::TimbreModel& getTimbreModel();
+
   private:
     Timbre(const mixxx::track::io::timbre::TimbreModel& m_timbreModel);
     void readByteArray(const QByteArray* pByteArray);

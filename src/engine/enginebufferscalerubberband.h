@@ -9,27 +9,28 @@ class RubberBandStretcher;
 
 class ReadAheadManager;
 
-// Uses librubberband to scale audio.
+// Uses librubberband to scale audio.  This class is not thread safe.
 class EngineBufferScaleRubberBand : public EngineBufferScale {
     Q_OBJECT
   public:
     EngineBufferScaleRubberBand(ReadAheadManager* pReadAheadManager);
-    virtual ~EngineBufferScaleRubberBand();
+    ~EngineBufferScaleRubberBand() override;
 
-    void setScaleParameters(int iSampleRate,
-                            double base_rate,
-                            bool speed_affects_pitch,
-                            double* speed_adjust,
-                            double* pitch_adjust);
+    void setScaleParameters(double base_rate,
+                            double* pTempoRatio,
+                            double* pPitchRatio) override;
+
+    void setSampleRate(int iSampleRate) override;
 
     // Read and scale buf_size samples from the provided RAMAN.
-    CSAMPLE* getScaled(unsigned long buf_size);
+    double getScaled(CSAMPLE* pOutput, const int iBufferSize) override;
 
     // Flush buffer.
-    void clear();
+    void clear() override;
 
-  private:
+    // Reset RubberBand library with new samplerate.
     void initializeRubberBand(int iSampleRate);
+  private:
     void deinterleaveAndProcess(const CSAMPLE* pBuffer, size_t frames, bool flush);
     size_t retrieveAndDeinterleave(CSAMPLE* pBuffer, size_t frames);
 

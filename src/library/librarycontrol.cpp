@@ -6,11 +6,12 @@
 #include <QModelIndexList>
 #include <QtDebug>
 
-#include "controlobject.h"
-#include "controlpushbutton.h"
-#include "playermanager.h"
+#include "control/controlobject.h"
+#include "control/controlpushbutton.h"
+#include "mixer/playermanager.h"
 #include "widget/wlibrary.h"
 #include "widget/wlibrarysidebar.h"
+#include "library/library.h"
 #include "library/libraryview.h"
 #include "util/container.h"
 
@@ -46,26 +47,23 @@ void LoadToGroupController::slotLoadToGroupAndPlay(double v) {
     }
 }
 
-LibraryControl::LibraryControl(QObject* pParent)
-        : QObject(pParent),
+LibraryControl::LibraryControl(Library* pLibrary)
+        : QObject(pLibrary),
+          m_pLibrary(pLibrary),
           m_pLibraryWidget(NULL),
           m_pSidebarWidget(NULL),
-          m_numDecks("[Master]", "num_decks"),
-          m_numSamplers("[Master]", "num_samplers"),
-          m_numPreviewDecks("[Master]", "num_preview_decks") {
+          m_numDecks("[Master]", "num_decks", this),
+          m_numSamplers("[Master]", "num_samplers", this),
+          m_numPreviewDecks("[Master]", "num_preview_decks", this) {
 
     slotNumDecksChanged(m_numDecks.get());
     slotNumSamplersChanged(m_numSamplers.get());
     slotNumPreviewDecksChanged(m_numPreviewDecks.get());
-    connect(&m_numDecks, SIGNAL(valueChanged(double)),
-            this, SLOT(slotNumDecksChanged(double)));
-    connect(&m_numSamplers, SIGNAL(valueChanged(double)),
-            this, SLOT(slotNumSamplersChanged(double)));
-    connect(&m_numPreviewDecks, SIGNAL(valueChanged(double)),
-            this, SLOT(slotNumPreviewDecksChanged(double)));
+    m_numDecks.connectValueChanged(SLOT(slotNumDecksChanged(double)));
+    m_numSamplers.connectValueChanged(SLOT(slotNumSamplersChanged(double)));
+    m_numPreviewDecks.connectValueChanged(SLOT(slotNumPreviewDecksChanged(double)));
 
-    // Make controls for library navigation and track loading. Leaking all these
-    // CO's, but oh well?
+    // Make controls for library navigation and track loading.
 
     m_pSelectNextTrack = new ControlPushButton(ConfigKey("[Playlist]", "SelectNextTrack"));
     connect(m_pSelectNextTrack, SIGNAL(valueChanged(double)),
@@ -101,7 +99,29 @@ LibraryControl::LibraryControl(QObject* pParent)
     connect(m_pLoadSelectedIntoFirstStopped, SIGNAL(valueChanged(double)),
             this, SLOT(slotLoadSelectedIntoFirstStopped(double)));
 
+    m_pAutoDjAddTop = new ControlPushButton(ConfigKey("[Playlist]","AutoDjAddTop"));
+    connect(m_pAutoDjAddTop, SIGNAL(valueChanged(double)),
+            this, SLOT(slotAutoDjAddTop(double)));
 
+    m_pAutoDjAddBottom = new ControlPushButton(ConfigKey("[Playlist]","AutoDjAddBottom"));
+    connect(m_pAutoDjAddBottom, SIGNAL(valueChanged(double)),
+            this, SLOT(slotAutoDjAddBottom(double)));
+
+    // Ignoring no-ops is important since this is for +/- tickers.
+    m_pFontSizeKnob = new ControlObject(
+            ConfigKey("[Library]", "font_size_knob"), false);
+    connect(m_pFontSizeKnob, SIGNAL(valueChanged(double)),
+            this, SLOT(slotFontSize(double)));
+
+    m_pFontSizeDecrement = new ControlPushButton(
+            ConfigKey("[Library]", "font_size_decrement"));
+    connect(m_pFontSizeDecrement, SIGNAL(valueChanged(double)),
+            this, SLOT(slotDecrementFontSize(double)));
+
+    m_pFontSizeIncrement = new ControlPushButton(
+            ConfigKey("[Library]", "font_size_increment"));
+    connect(m_pFontSizeIncrement, SIGNAL(valueChanged(double)),
+            this, SLOT(slotIncrementFontSize(double)));
 }
 
 LibraryControl::~LibraryControl() {
@@ -113,6 +133,11 @@ LibraryControl::~LibraryControl() {
    delete m_pSelectSidebarItem;
    delete m_pToggleSidebarItem;
    delete m_pLoadSelectedIntoFirstStopped;
+   delete m_pAutoDjAddTop;
+   delete m_pAutoDjAddBottom;
+   delete m_pFontSizeKnob;
+   delete m_pFontSizeDecrement;
+   delete m_pFontSizeIncrement;
    deleteMapValues(&m_loadToGroupControllers);
 }
 
@@ -169,7 +194,7 @@ void LibraryControl::bindSidebarWidget(WLibrarySidebar* pSidebarWidget) {
             this, SLOT(sidebarWidgetDeleted()));
 }
 
-void LibraryControl::bindWidget(WLibrary* pLibraryWidget, MixxxKeyboard* pKeyboard) {
+void LibraryControl::bindWidget(WLibrary* pLibraryWidget, KeyboardEventFilter* pKeyboard) {
     Q_UNUSED(pKeyboard);
     if (m_pLibraryWidget != NULL) {
         disconnect(m_pLibraryWidget, 0, this, 0);
@@ -210,6 +235,34 @@ void LibraryControl::slotLoadSelectedIntoFirstStopped(double v) {
             return;
         }
         activeView->loadSelectedTrack();
+    }
+}
+
+void LibraryControl::slotAutoDjAddTop(double v) {
+    if (m_pLibraryWidget == NULL) {
+        return;
+    }
+
+    if (v > 0) {
+        LibraryView* activeView = m_pLibraryWidget->getActiveView();
+        if (!activeView) {
+            return;
+        }
+        activeView->slotSendToAutoDJTop();
+    }
+}
+
+void LibraryControl::slotAutoDjAddBottom(double v) {
+    if (m_pLibraryWidget == NULL) {
+        return;
+    }
+
+    if (v > 0) {
+        LibraryView* activeView = m_pLibraryWidget->getActiveView();
+        if (!activeView) {
+            return;
+        }
+        activeView->slotSendToAutoDJ();
     }
 }
 
@@ -275,5 +328,26 @@ void LibraryControl::slotSelectPrevSidebarItem(double v) {
 void LibraryControl::slotToggleSelectedSidebarItem(double v) {
     if (m_pSidebarWidget != NULL && v > 0) {
         m_pSidebarWidget->toggleSelectedItem();
+    }
+}
+
+void LibraryControl::slotFontSize(double v) {
+    if (v == 0.0) {
+        return;
+    }
+    QFont font = m_pLibrary->getTrackTableFont();
+    font.setPointSizeF(font.pointSizeF() + v);
+    m_pLibrary->slotSetTrackTableFont(font);
+}
+
+void LibraryControl::slotIncrementFontSize(double v) {
+    if (v > 0.0) {
+        slotFontSize(1);
+    }
+}
+
+void LibraryControl::slotDecrementFontSize(double v) {
+    if (v > 0.0) {
+        slotFontSize(-1);
     }
 }

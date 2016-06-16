@@ -1,14 +1,14 @@
 #ifndef SELECTORFILTERS_H
 #define SELECTORFILTERS_H
 
-#include "configobject.h"
-#include "trackinfoobject.h"
+#include "track/track.h"
+#include "preferences/usersettings.h"
 
 class SelectorFilters : public QObject {
     Q_OBJECT
   public:
     SelectorFilters(QObject* pParent,
-                    ConfigObject<ConfigValue>* pConfig);
+                    UserSettingsPointer pConfig);
     virtual ~SelectorFilters();
 
   public slots:
@@ -25,7 +25,7 @@ class SelectorFilters : public QObject {
     QString getFilterString(TrackPointer pTrack);
 
   private:
-    ConfigObject<ConfigValue>* m_pConfig;
+    UserSettingsPointer m_pConfig;
 
     QList<mixxx::track::io::key::ChromaticKey> getHarmonicKeys(
             mixxx::track::io::key::ChromaticKey key);

@@ -3,8 +3,8 @@
 #include "waveformwidgetrenderer.h"
 #include "waveform/waveform.h"
 #include "waveform/waveformwidgetfactory.h"
-#include "controlobjectthread.h"
-#include "trackinfoobject.h"
+#include "control/controlproxy.h"
+#include "track/track.h"
 #include "util/math.h"
 
 #include <QLineF>
@@ -101,8 +101,8 @@ int QtWaveformRendererFilteredSignal::buildPolygon() {
         return 0;
     }
 
-    const Waveform* waveform = pTrack->getWaveform();
-    if (waveform == NULL) {
+    ConstWaveformPointer waveform = pTrack->getWaveform();
+    if (waveform.isNull()) {
         return 0;
     }
 

@@ -7,7 +7,7 @@
 
 #include "library/trackmodel.h"
 #include "library/basesqltablemodel.h"
-#include "trackinfoobject.h"
+#include "track/track.h"
 
 class TrackCollection;
 
@@ -23,13 +23,9 @@ class BaseExternalTrackModel : public BaseSqlTableModel {
 
     virtual TrackModel::CapabilitiesFlags getCapabilities() const;
     TrackPointer getTrack(const QModelIndex& index) const;
+    virtual void trackLoaded(QString group, TrackPointer pTrack);
     virtual bool isColumnInternal(int column);
-    virtual bool isColumnHiddenByDefault(int column);
     Qt::ItemFlags flags(const QModelIndex &index) const;
-
-  private:
-    QString m_trackTable;
-    QString m_trackSource;
 };
 
 #endif /* BASEEXTERNALTRACKMODEL_H */

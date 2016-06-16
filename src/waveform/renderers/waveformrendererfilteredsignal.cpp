@@ -3,9 +3,9 @@
 #include "waveformwidgetrenderer.h"
 #include "waveform/waveform.h"
 #include "waveform/waveformwidgetfactory.h"
-#include "controlobjectthread.h"
+#include "control/controlproxy.h"
 #include "widget/wskincolor.h"
-#include "trackinfoobject.h"
+#include "track/track.h"
 #include "widget/wwidget.h"
 #include "util/math.h"
 
@@ -34,8 +34,8 @@ void WaveformRendererFilteredSignal::draw(QPainter* painter,
         return;
     }
 
-    const Waveform* waveform = trackInfo->getWaveform();
-    if (waveform == NULL) {
+    ConstWaveformPointer waveform = trackInfo->getWaveform();
+    if (waveform.isNull()) {
         return;
     }
 

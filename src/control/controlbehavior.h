@@ -2,6 +2,7 @@
 #define CONTROLBEHAVIOR_H
 
 #include <QTimer>
+#include <QScopedPointer>
 
 #include "controllers/midi/midimessage.h"
 
@@ -44,15 +45,15 @@ class ControlPotmeterBehavior : public ControlNumericBehavior {
 
 class ControlLogPotmeterBehavior : public ControlPotmeterBehavior {
   public:
-    ControlLogPotmeterBehavior(double dMinValue, double dMaxValue);
+    ControlLogPotmeterBehavior(double dMinValue, double dMaxValue, double minDB);
     virtual ~ControlLogPotmeterBehavior();
 
     virtual double valueToParameter(double dValue);
     virtual double parameterToValue(double dParam);
 
   protected:
-    bool m_bTwoState;
-    double m_dB1, m_dB2;
+    double m_minDB;
+    double m_minOffset;
 };
 
 class ControlLinPotmeterBehavior : public ControlPotmeterBehavior {
@@ -70,7 +71,7 @@ class ControlAudioTaperPotBehavior : public ControlPotmeterBehavior {
 
     virtual double valueToParameter(double dValue);
     virtual double parameterToValue(double dParam);
-    virtual double midiValueToParameter(double midiValue) const;
+    virtual double midiValueToParameter(double midiValue);
     virtual double valueToMidiParameter(double dValue);
     virtual void setValueFromMidiParameter(MidiOpCode o, double dParam,
                                            ControlDoublePrivate* pControl);
@@ -116,9 +117,17 @@ class ControlPushButtonBehavior : public ControlNumericBehavior {
                                            ControlDoublePrivate* pControl);
 
   private:
+    // We create many hundreds of push buttons at Mixxx startup and most of them
+    // never use their timer. Delay creation of the timer until it's needed.
+    QTimer* getTimer() {
+        if (m_pushTimer.isNull()) {
+            m_pushTimer.reset(new QTimer());
+        }
+        return m_pushTimer.data();
+    }
     ButtonMode m_buttonMode;
     int m_iNumStates;
-    QTimer m_pushTimer;
+    QScopedPointer<QTimer> m_pushTimer;
 };
 
 #endif /* CONTROLBEHAVIOR_H */

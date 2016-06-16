@@ -5,13 +5,14 @@
 
 #include "track/timbre.h"
 #include "proto/timbre.pb.h"
-#include "trackinfoobject.h"
+#include "track/track.h"
 
 class TimbreFactory {
   public:
     static TimbrePointer loadTimbreFromByteArray(TrackPointer pTrack,
-        QString timbreVersion, QString timbreSubVersion,
-        QByteArray* timbreSerialized);
+                                                 QString timbreVersion,
+                                                 QString timbreSubVersion,
+                                                 QByteArray* timbreSerialized);
     static TimbrePointer makeTimbreModel(std::vector<double> mean,
         std::vector<double> variance, std::vector<double> beatSpectrum);
     static TimbrePointer makeTimbreModelFromVamp(QVector<double> timbreVector);

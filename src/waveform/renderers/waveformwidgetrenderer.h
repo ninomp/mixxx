@@ -6,15 +6,16 @@
 #include <QVector>
 #include <QtDebug>
 
-#include "trackinfoobject.h"
-#include "util.h"
+#include "track/track.h"
+#include "util/class.h"
 #include "waveform/renderers/waveformrendererabstract.h"
 #include "waveform/renderers/waveformsignalcolors.h"
+#include "util/performancetimer.h"
 
 //#define WAVEFORMWIDGETRENDERER_DEBUG
 
-class TrackInfoObject;
-class ControlObjectThread;
+class Track;
+class ControlProxy;
 class VisualPlayPosition;
 class VSyncThread;
 
@@ -34,8 +35,8 @@ class WaveformWidgetRenderer {
     void onPreRender(VSyncThread* vsyncThread);
     void draw(QPainter* painter, QPaintEvent* event);
 
-    const char* getGroup() const { return m_group;}
-    const TrackPointer getTrackInfo() const { return m_trackInfoObject;}
+    inline const char* getGroup() const { return m_group;}
+    const TrackPointer getTrackInfo() const { return m_pTrack;}
 
     double getFirstDisplayedPosition() const { return m_firstDisplayedPosition;}
     double getLastDisplayedPosition() const { return m_lastDisplayedPosition;}
@@ -85,7 +86,7 @@ class WaveformWidgetRenderer {
 
   protected:
     const char* m_group;
-    TrackPointer m_trackInfoObject;
+    TrackPointer m_pTrack;
     QList<WaveformRendererAbstract*> m_rendererStack;
     int m_height;
     int m_width;
@@ -105,19 +106,19 @@ class WaveformWidgetRenderer {
     QSharedPointer<VisualPlayPosition> m_visualPlayPosition;
     double m_playPos;
     int m_playPosVSample;
-    ControlObjectThread* m_pRateControlObject;
+    ControlProxy* m_pRateControlObject;
     double m_rate;
-    ControlObjectThread* m_pRateRangeControlObject;
+    ControlProxy* m_pRateRangeControlObject;
     double m_rateRange;
-    ControlObjectThread* m_pRateDirControlObject;
+    ControlProxy* m_pRateDirControlObject;
     double m_rateDir;
-    ControlObjectThread* m_pGainControlObject;
+    ControlProxy* m_pGainControlObject;
     double m_gain;
-    ControlObjectThread* m_pTrackSamplesControlObject;
+    ControlProxy* m_pTrackSamplesControlObject;
     int m_trackSamples;
 
 #ifdef WAVEFORMWIDGETRENDERER_DEBUG
-    QTime* m_timer;
+    PerformanceTimer* m_timer;
     int m_lastFrameTime;
     int m_lastFramesTime[100];
     int m_lastSystemFrameTime;

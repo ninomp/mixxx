@@ -7,8 +7,8 @@
 
 #include "library/libraryfeature.h"
 #include "library/treeitemmodel.h"
-#include "configobject.h"
-#include "dlgselector.h"
+#include "library/dlgselector.h"
+#include "preferences/usersettings.h"
 
 class LibraryTableModel;
 class TrackCollection;
@@ -17,8 +17,8 @@ class SelectorFeature : public LibraryFeature {
     Q_OBJECT
   public:
     SelectorFeature(QObject* parent,
-                   ConfigObject<ConfigValue>* pConfig,
-                   TrackCollection* pTrackCollection);
+                    UserSettingsPointer pConfig,
+                    TrackCollection* pTrackCollection);
     virtual ~SelectorFeature();
 
     QVariant title();
@@ -27,7 +27,7 @@ class SelectorFeature : public LibraryFeature {
     bool dropAccept(QList<QUrl> urls,QWidget *pSource);
     bool dragMoveAccept(QUrl url);
     void bindWidget(WLibrary* libraryWidget,
-                    MixxxKeyboard* keyboard);
+                    KeyboardEventFilter* keyboard);
     TreeItemModel* getChildModel();
 
   public slots:
@@ -36,7 +36,7 @@ class SelectorFeature : public LibraryFeature {
     void calculateAllSimilarities(const QString& filename);
 
   private:
-    ConfigObject<ConfigValue>* m_pConfig;
+    UserSettingsPointer m_pConfig;
     TrackCollection* m_pTrackCollection;
     const static QString m_sSelectorViewName;
     TreeItemModel m_childModel;

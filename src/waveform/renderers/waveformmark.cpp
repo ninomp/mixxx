@@ -3,28 +3,28 @@
 #include "waveformmark.h"
 
 #include "waveformwidgetrenderer.h"
-#include "controlobject.h"
-#include "controlobjectthread.h"
+#include "control/controlobject.h"
+#include "control/controlproxy.h"
 #include "widget/wskincolor.h"
 
 WaveformMark::WaveformMark()
-    : m_pointControl(NULL) {
+    : m_pPointCos(nullptr) {
 }
 
 WaveformMark::~WaveformMark() {
-    if (m_pointControl) {
-        delete m_pointControl;
-    }
+    delete m_pPointCos;
 }
 
 void WaveformMark::setup(const QString& group, const QDomNode& node,
                          const SkinContext& context,
                          const WaveformSignalColors& signalColors) {
     QString item = context.selectString(node, "Control");
-    m_pointControl = new ControlObjectThread(group, item);
+    if (!item.isEmpty()) {
+        m_pPointCos = new ControlProxy(group, item);
+    }
 
     m_color = context.selectString(node, "Color");
-    if (m_color == "") {
+    if (!m_color.isValid()) {
         // As a fallback, grab the color from the parent's AxesColor
         m_color = signalColors.getAxesColor();
         qDebug() << "Didn't get mark <Color>, using parent's <AxesColor>:" << m_color;
@@ -33,7 +33,7 @@ void WaveformMark::setup(const QString& group, const QDomNode& node,
     }
 
     m_textColor = context.selectString(node, "TextColor");
-    if (m_textColor == "") {
+    if (!m_textColor.isValid()) {
         // Read the text color, otherwise use the parent's BgColor.
         m_textColor = signalColors.getBgColor();
         qDebug() << "Didn't get mark <TextColor>, using parent's <BgColor>:" << m_textColor;
@@ -53,8 +53,10 @@ void WaveformMark::setup(const QString& group, const QDomNode& node,
     }
 }
 
-
+// called from WaveformMarkSet::setup() for hot cues
+// TODO(XXX): subclass and override WaveformMark::setup
 void WaveformMark::setKeyAndIndex(const ConfigKey& key, int i) {
-    m_pointControl = new ControlObjectThread(key);
+    DEBUG_ASSERT(m_pPointCos == NULL);
+    m_pPointCos = new ControlProxy(key);
     m_text = m_text.arg(i);
 }

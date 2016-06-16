@@ -1,5 +1,5 @@
 #include <QtDebug>
-#include <QMutexLocker>
+#include <QSharedPointer>
 
 #include "control/control.h"
 
@@ -7,11 +7,15 @@
 #include "util/timer.h"
 
 // Static member variable definition
-ConfigObject<ConfigValue>* ControlDoublePrivate::s_pUserConfig = NULL;
-QHash<ConfigKey, QWeakPointer<ControlDoublePrivate> > ControlDoublePrivate::s_qCOHash;
-QHash<ConfigKey, QWeakPointer<ControlDoublePrivate> > ControlDoublePrivate::s_qCOAliasHash;
-QMutex ControlDoublePrivate::s_qCOHashMutex;
-QMutex ControlDoublePrivate::s_qCOAliasHashMutex;
+UserSettingsPointer ControlDoublePrivate::s_pUserConfig;
+
+QHash<ConfigKey, QWeakPointer<ControlDoublePrivate> > ControlDoublePrivate::s_qCOHash
+GUARDED_BY(ControlDoublePrivate::s_qCOHashMutex);
+
+QHash<ConfigKey, ConfigKey> ControlDoublePrivate::s_qCOAliasHash
+GUARDED_BY(ControlDoublePrivate::s_qCOHashMutex);
+
+MMutex ControlDoublePrivate::s_qCOHashMutex;
 
 /*
 ControlDoublePrivate::ControlDoublePrivate()
@@ -33,7 +37,6 @@ ControlDoublePrivate::ControlDoublePrivate(ConfigKey key,
           m_bPersistInConfiguration(bPersist),
           m_bIgnoreNops(bIgnoreNops),
           m_bTrack(bTrack),
-          m_trackKey("control " + m_key.group + "," + m_key.item),
           m_trackType(Stat::UNSPECIFIED),
           m_trackFlags(Stat::COUNT | Stat::SUM | Stat::AVERAGE |
                        Stat::SAMPLE_VARIANCE | Stat::MIN | Stat::MAX),
@@ -45,7 +48,7 @@ ControlDoublePrivate::ControlDoublePrivate(ConfigKey key,
 void ControlDoublePrivate::initialize() {
     double value = 0;
     if (m_bPersistInConfiguration) {
-        ConfigObject<ConfigValue>* pConfig = ControlDoublePrivate::s_pUserConfig;
+        UserSettingsPointer pConfig = ControlDoublePrivate::s_pUserConfig;
         if (pConfig != NULL) {
             // Assume toDouble() returns 0 if conversion fails.
             value = pConfig->getValueString(m_key).toDouble();
@@ -58,6 +61,7 @@ void ControlDoublePrivate::initialize() {
 
     if (m_bTrack) {
         // TODO(rryan): Make configurable.
+        m_trackKey = "control " + m_key.group + "," + m_key.item;
         Stat::track(m_trackKey, static_cast<Stat::StatType>(m_trackType),
                     static_cast<Stat::ComputeFlags>(m_trackFlags),
                     m_value.getValue());
@@ -71,7 +75,7 @@ ControlDoublePrivate::~ControlDoublePrivate() {
     s_qCOHashMutex.unlock();
 
     if (m_bPersistInConfiguration) {
-        ConfigObject<ConfigValue>* pConfig = ControlDoublePrivate::s_pUserConfig;
+        UserSettingsPointer pConfig = ControlDoublePrivate::s_pUserConfig;
         if (pConfig != NULL) {
             pConfig->set(m_key, QString::number(get()));
         }
@@ -80,46 +84,63 @@ ControlDoublePrivate::~ControlDoublePrivate() {
 
 // static
 void ControlDoublePrivate::insertAlias(const ConfigKey& alias, const ConfigKey& key) {
-    QSharedPointer<ControlDoublePrivate> pControl = getControl(key);
-    QMutexLocker locker(&s_qCOAliasHashMutex);
-    s_qCOAliasHash.insert(alias, pControl);
+    MMutexLocker locker(&s_qCOHashMutex);
+
+    QHash<ConfigKey, QWeakPointer<ControlDoublePrivate> >::const_iterator it =
+            s_qCOHash.find(key);
+    if (it == s_qCOHash.end()) {
+        qWarning() << "WARNING: ControlDoublePrivate::insertAlias called for null control" << key;
+        return;
+    }
+
+    QSharedPointer<ControlDoublePrivate> pControl = it.value();
+    if (pControl.isNull()) {
+        qWarning() << "WARNING: ControlDoublePrivate::insertAlias called for expired control" << key;
+        return;
+    }
+
+    s_qCOAliasHash.insert(key, alias);
+    s_qCOHash.insert(alias, pControl);
 }
 
 // static
 QSharedPointer<ControlDoublePrivate> ControlDoublePrivate::getControl(
         const ConfigKey& key, bool warn, ControlObject* pCreatorCO,
         bool bIgnoreNops, bool bTrack, bool bPersist) {
-    QMutexLocker locker(&s_qCOHashMutex);
-    QSharedPointer<ControlDoublePrivate> pControl;
-    QHash<ConfigKey, QWeakPointer<ControlDoublePrivate> >::const_iterator it = s_qCOHash.find(key);
-
-    if (it != s_qCOHash.end()) {
-        if (pCreatorCO) {
-            if (warn) {
-                qDebug() << "ControlObject" << key.group << key.item << "already created";
-            }
-        } else {
-            pControl = it.value();
+    if (key.isEmpty()) {
+        if (warn) {
+            qWarning() << "ControlDoublePrivate::getControl returning NULL"
+                       << "for empty ConfigKey.";
         }
-    } else {
-        QMutexLocker locker(&s_qCOAliasHashMutex);
-        QHash<ConfigKey, QWeakPointer<ControlDoublePrivate> >::const_iterator it = s_qCOAliasHash.find(key);
-        if (it != s_qCOAliasHash.end()) {
-            pControl = it.value();
-        }
+        return QSharedPointer<ControlDoublePrivate>();
     }
 
-    locker.unlock();
+
+    QSharedPointer<ControlDoublePrivate> pControl;
+    // Scope for MMutexLocker.
+    {
+        MMutexLocker locker(&s_qCOHashMutex);
+        QHash<ConfigKey, QWeakPointer<ControlDoublePrivate> >::const_iterator it = s_qCOHash.find(key);
+
+        if (it != s_qCOHash.end()) {
+            if (pCreatorCO) {
+                if (warn) {
+                    qDebug() << "ControlObject" << key.group << key.item << "already created";
+                }
+            } else {
+                pControl = it.value();
+            }
+        }
+    }
 
     if (pControl == NULL) {
         if (pCreatorCO) {
             pControl = QSharedPointer<ControlDoublePrivate>(
                     new ControlDoublePrivate(key, pCreatorCO, bIgnoreNops,
                                              bTrack, bPersist));
-            locker.relock();
+            MMutexLocker locker(&s_qCOHashMutex);
             //qDebug() << "ControlDoublePrivate::s_qCOHash.insert(" << key.group << "," << key.item << ")";
             s_qCOHash.insert(key, pControl);
-            locker.unlock();
         } else if (warn) {
             qWarning() << "ControlDoublePrivate::getControl returning NULL for ("
                        << key.group << "," << key.item << ")";
@@ -143,6 +164,12 @@ void ControlDoublePrivate::getControls(
     s_qCOHashMutex.unlock();
 }
 
+// static
+QHash<ConfigKey, ConfigKey> ControlDoublePrivate::getControlAliases() {
+    MMutexLocker locker(&s_qCOHashMutex);
+    return s_qCOAliasHash;
+}
+
 void ControlDoublePrivate::reset() {
     double defaultValue = m_defaultValue.getValue();
     // NOTE: pSender = NULL is important. The originator of this action does
@@ -157,7 +184,7 @@ void ControlDoublePrivate::set(double value, QObject* pSender) {
     if (!pBehavior.isNull() && !pBehavior->setFilter(&value)) {
         return;
     }
-    if(m_confirmRequired) {
+    if (m_confirmRequired) {
         emit(valueChangeRequest(value));
     } else {
         setInner(value, pSender);

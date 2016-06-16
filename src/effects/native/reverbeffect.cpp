@@ -1,8 +1,8 @@
-#include <QtDebug>
-
 #include "effects/native/reverbeffect.h"
 
-#include "sampleutil.h"
+#include <QtDebug>
+
+#include "util/sample.h"
 
 // static
 QString ReverbEffect::getId() {
@@ -29,7 +29,6 @@ EffectManifest ReverbEffect::getManifest() {
     time->setDescription(QObject::tr("Higher bandwidth values cause more "
             "bright (high-frequency) tones to be included"));
     time->setControlHint(EffectManifestParameter::CONTROL_KNOB_LINEAR);
-    time->setValueHint(EffectManifestParameter::VALUE_FLOAT);
     time->setSemanticHint(EffectManifestParameter::SEMANTIC_UNKNOWN);
     time->setUnitsHint(EffectManifestParameter::UNITS_UNKNOWN);
     time->setMinimum(0.0005);
@@ -42,7 +41,6 @@ EffectManifest ReverbEffect::getManifest() {
     damping->setDescription(QObject::tr("Higher damping values cause "
             "reverberations to die out more quickly."));
     damping->setControlHint(EffectManifestParameter::CONTROL_KNOB_LINEAR);
-    damping->setValueHint(EffectManifestParameter::VALUE_FLOAT);
     damping->setSemanticHint(EffectManifestParameter::SEMANTIC_UNKNOWN);
     damping->setUnitsHint(EffectManifestParameter::UNITS_UNKNOWN);
     damping->setMinimum(0.005);
@@ -63,19 +61,19 @@ ReverbEffect::~ReverbEffect() {
     //qDebug() << debugString() << "destroyed";
 }
 
-void ReverbEffect::processGroup(const QString& group,
+void ReverbEffect::processChannel(const ChannelHandle& handle,
                                 ReverbGroupState* pState,
                                 const CSAMPLE* pInput, CSAMPLE* pOutput,
                                 const unsigned int numSamples,
                                 const unsigned int sampleRate,
+                                const EffectProcessor::EnableState enableState,
                                 const GroupFeatureState& groupFeatures) {
-    Q_UNUSED(group);
+    Q_UNUSED(handle);
+    Q_UNUSED(enableState);
     Q_UNUSED(groupFeatures);
     Q_UNUSED(sampleRate);
-    CSAMPLE bandwidth = m_pBandWidthParameter ?
-            m_pBandWidthParameter->value().toDouble() : 1.0f;
-    CSAMPLE damping = m_pDampingParameter ?
-            m_pDampingParameter->value().toDouble() : 0.5f;
+    CSAMPLE bandwidth = m_pBandWidthParameter->value();
+    CSAMPLE damping = m_pDampingParameter->value();
 
     // Flip value around.  Assumes max allowable is 1.0.
     damping = 1.0 - damping;

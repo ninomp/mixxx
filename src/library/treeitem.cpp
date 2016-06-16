@@ -35,6 +35,7 @@ TreeItem::TreeItem(const QString &data, const QString &data_path,
     m_dataPath = data_path;
     m_parentItem = parent;
     m_feature = feature;
+    m_bold = false;
 }
 
 TreeItem::TreeItem() {
@@ -42,6 +43,7 @@ TreeItem::TreeItem() {
     m_dataPath = "$root";
     m_parentItem = NULL;
     m_feature = NULL;
+    m_bold = false;
 }
 
 TreeItem::~TreeItem() {
@@ -112,7 +114,7 @@ bool TreeItem::removeChildren(int position, int count) {
     if (position < 0 || position + count > m_childItems.size())
         return false;
 
-    for (int row = 0; row < count; ++row){
+    for (int row = 0; row < count; ++row) {
         //Remove from list to avoid invalid pointers
         TreeItem* item = m_childItems.takeAt(position);
         if(item) delete item;

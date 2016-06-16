@@ -6,7 +6,7 @@
 #include "skin/skincontext.h"
 
 class ControlObject;
-class ControlObjectThread;
+class ControlProxy;
 
 class WaveformRendererSignalBase : public WaveformRendererAbstract {
 public:
@@ -26,13 +26,13 @@ public:
                   float* highGain);
 
   protected:
-    ControlObjectThread* m_pEQEnabled;
-    ControlObjectThread* m_pLowFilterControlObject;
-    ControlObjectThread* m_pMidFilterControlObject;
-    ControlObjectThread* m_pHighFilterControlObject;
-    ControlObjectThread* m_pLowKillControlObject;
-    ControlObjectThread* m_pMidKillControlObject;
-    ControlObjectThread* m_pHighKillControlObject;
+    ControlProxy* m_pEQEnabled;
+    ControlProxy* m_pLowFilterControlObject;
+    ControlProxy* m_pMidFilterControlObject;
+    ControlProxy* m_pHighFilterControlObject;
+    ControlProxy* m_pLowKillControlObject;
+    ControlProxy* m_pMidKillControlObject;
+    ControlProxy* m_pHighKillControlObject;
 
     Qt::Alignment m_alignment;
 
@@ -42,6 +42,9 @@ public:
     qreal m_lowColor_r, m_lowColor_g, m_lowColor_b;
     qreal m_midColor_r, m_midColor_g, m_midColor_b;
     qreal m_highColor_r, m_highColor_g, m_highColor_b;
+    qreal m_rgbLowColor_r, m_rgbLowColor_g, m_rgbLowColor_b;
+    qreal m_rgbMidColor_r, m_rgbMidColor_g, m_rgbMidColor_b;
+    qreal m_rgbHighColor_r, m_rgbHighColor_g, m_rgbHighColor_b;
 };
 
 #endif // WAVEFORMRENDERERSIGNALBASE_H
