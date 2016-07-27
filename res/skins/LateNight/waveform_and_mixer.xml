@@ -152,6 +152,33 @@
                         <SizePolicy>min,min</SizePolicy>
                         <Children>
                             <PushButton>
+                            <Size>40f,20f</Size>
+                            <ObjectName>GuiToggleButton</ObjectName>
+                            <NumberStates>2</NumberStates>
+                            <State>
+                              <Number>0</Number>
+                              <Text>VERT</Text>
+                            </State>
+                            <State>
+                              <Number>1</Number>
+                              <Text>VERT</Text>
+                            </State>
+                            <Connection>
+                              <ConfigKey persist="true">[Master],vertical_waveforms</ConfigKey>
+                              <ButtonState>LeftButton</ButtonState>
+                            </Connection>
+                            <Connection>
+                              <ConfigKey persist="true">[Master],vertical_waveforms</ConfigKey>
+                            </Connection>
+                            </PushButton>
+                        </Children>
+                    </WidgetGroup>
+                    <WidgetGroup>
+                        <ObjectName>GuiToggleContainer</ObjectName>
+                        <Layout>vertical</Layout>
+                        <SizePolicy>min,min</SizePolicy>
+                        <Children>
+                            <PushButton>
                                 <Size>40f,20f</Size>
                                 <TooltipId>show_vinylcontrol</TooltipId>
                                 <ObjectName>GuiToggleButton</ObjectName>
@@ -206,86 +233,275 @@
                     </WidgetGroup>
                 </Children>
             </WidgetGroup>
-			<WidgetGroup>
-				<Layout>horizontal</Layout>
-				<SizePolicy>me,f</SizePolicy>
-				<Children>
-					<Template src="skin:spinny.xml">
-						<SetVariable name="channum">3</SetVariable>
-                        <SetVariable name="color">2</SetVariable>
-					</Template>
-					<Template src="skin:waveform.xml">
-						<SetVariable name="channum">3</SetVariable>
-                        <SetVariable name="signal_color">#09B2AE</SetVariable>
-                        <SetVariable name="SignalBgColor">#012322</SetVariable>
-                        <SetVariable name="SignalRGBLowColor">#cb3433</SetVariable>
-                        <SetVariable name="SignalRGBMidColor">#00ff33</SetVariable>
-                        <SetVariable name="SignalRGBHighColor">#0034fe</SetVariable>
-					</Template>
-				</Children>
-				<Connection>
-					<ConfigKey persist="true">[Master],show_4decks</ConfigKey>
-					<BindProperty>visible</BindProperty>
-				</Connection>
-			</WidgetGroup>
-			<WidgetGroup>
-				<Layout>horizontal</Layout>
+            <WidgetGroup>
+                <Layout>vertical</Layout>
                 <SizePolicy>me,f</SizePolicy>
-				<Children>
-					<Template src="skin:spinny.xml">
-						<SetVariable name="channum">1</SetVariable>
-                        <SetVariable name="color">1</SetVariable>
-					</Template>
-					<Template src="skin:waveform.xml">
-						<SetVariable name="channum">1</SetVariable>
-                        <SetVariable name="signal_color">#E7C413</SetVariable>
-                        <SetVariable name="SignalBgColor">#2f290a</SetVariable>
-                        <SetVariable name="SignalRGBLowColor">#ff2a00</SetVariable>
-                        <SetVariable name="SignalRGBMidColor">#33f600</SetVariable>
-                        <SetVariable name="SignalRGBHighColor">#332acc</SetVariable>
-					</Template>
-				</Children>
-			</WidgetGroup>
-			<WidgetGroup>
-				<Layout>horizontal</Layout>
-                <SizePolicy>me,f</SizePolicy>
-				<Children>
-					<Template src="skin:spinny.xml">
-						<SetVariable name="channum">2</SetVariable>
-                        <SetVariable name="color">1</SetVariable>
-					</Template>
-					<Template src="skin:waveform.xml">
-						<SetVariable name="channum">2</SetVariable>
-                        <SetVariable name="signal_color">#E7C413</SetVariable>
-                        <SetVariable name="SignalBgColor">#2f290a</SetVariable>
-                        <SetVariable name="SignalRGBLowColor">#ff2a00</SetVariable>
-                        <SetVariable name="SignalRGBMidColor">#33f600</SetVariable>
-                        <SetVariable name="SignalRGBHighColor">#332acc</SetVariable>
-					</Template>
-				</Children>
-			</WidgetGroup>
-			<WidgetGroup>
-				<SizePolicy>me,f</SizePolicy>
-				<Layout>horizontal</Layout>
-				<Children>
-					<Template src="skin:spinny.xml">
-						<SetVariable name="channum">4</SetVariable>
-                        <SetVariable name="color">2</SetVariable>
-					</Template>
-					<Template src="skin:waveform.xml">
-						<SetVariable name="channum">4</SetVariable>
-                        <SetVariable name="signal_color">#09B2AE</SetVariable>
-                        <SetVariable name="SignalBgColor">#012322</SetVariable>
-                        <SetVariable name="SignalRGBLowColor">#cb3433</SetVariable>
-                        <SetVariable name="SignalRGBMidColor">#00ff33</SetVariable>
-                        <SetVariable name="SignalRGBHighColor">#0034fe</SetVariable>
-					</Template>
-				</Children>
-				<Connection>
-					<ConfigKey persist="true">[Master],show_4decks</ConfigKey>
-					<BindProperty>visible</BindProperty>
-				</Connection>
-			</WidgetGroup>
+                <Children>
+                    <WidgetGroup>
+                        <Layout>horizontal</Layout>
+                        <SizePolicy>me,f</SizePolicy>
+                        <Children>
+                            <Template src="skin:spinny.xml">
+                                <SetVariable name="channum">3</SetVariable>
+                                <SetVariable name="color">2</SetVariable>
+                            </Template>
+                            <Template src="skin:waveform.xml">
+                                <SetVariable name="channum">3</SetVariable>
+                                <SetVariable name="signal_color">#09B2AE</SetVariable>
+                                <SetVariable name="SignalBgColor">#012322</SetVariable>
+                                <SetVariable name="SignalRGBLowColor">#cb3433</SetVariable>
+                                <SetVariable name="SignalRGBMidColor">#00ff33</SetVariable>
+                                <SetVariable name="SignalRGBHighColor">#0034fe</SetVariable>
+                            </Template>
+                        </Children>
+                        <Connection>
+                            <ConfigKey persist="true">[Master],show_4decks</ConfigKey>
+                            <BindProperty>visible</BindProperty>
+                        </Connection>
+                    </WidgetGroup>
+                    <WidgetGroup>
+                        <Layout>horizontal</Layout>
+                        <SizePolicy>me,f</SizePolicy>
+                        <Children>
+                            <Template src="skin:spinny.xml">
+                                <SetVariable name="channum">1</SetVariable>
+                                <SetVariable name="color">1</SetVariable>
+                            </Template>
+                            <Template src="skin:waveform.xml">
+                                <SetVariable name="channum">1</SetVariable>
+                                <SetVariable name="signal_color">#E7C413</SetVariable>
+                                <SetVariable name="SignalBgColor">#2f290a</SetVariable>
+                                <SetVariable name="SignalRGBLowColor">#ff2a00</SetVariable>
+                                <SetVariable name="SignalRGBMidColor">#33f600</SetVariable>
+                                <SetVariable name="SignalRGBHighColor">#332acc</SetVariable>
+                            </Template>
+                        </Children>
+                    </WidgetGroup>
+                    <WidgetGroup>
+                        <Layout>horizontal</Layout>
+                        <SizePolicy>me,f</SizePolicy>
+                        <Children>
+                            <Template src="skin:spinny.xml">
+                                <SetVariable name="channum">2</SetVariable>
+                                <SetVariable name="color">1</SetVariable>
+                            </Template>
+                            <Template src="skin:waveform.xml">
+                                <SetVariable name="channum">2</SetVariable>
+                                <SetVariable name="signal_color">#E7C413</SetVariable>
+                                <SetVariable name="SignalBgColor">#2f290a</SetVariable>
+                                <SetVariable name="SignalRGBLowColor">#ff2a00</SetVariable>
+                                <SetVariable name="SignalRGBMidColor">#33f600</SetVariable>
+                                <SetVariable name="SignalRGBHighColor">#332acc</SetVariable>
+                            </Template>
+                        </Children>
+                    </WidgetGroup>
+                    <WidgetGroup>
+                        <SizePolicy>me,f</SizePolicy>
+                        <Layout>horizontal</Layout>
+                        <Children>
+                            <Template src="skin:spinny.xml">
+                                <SetVariable name="channum">4</SetVariable>
+                                <SetVariable name="color">2</SetVariable>
+                            </Template>
+                            <Template src="skin:waveform.xml">
+                                <SetVariable name="channum">4</SetVariable>
+                                <SetVariable name="signal_color">#09B2AE</SetVariable>
+                                <SetVariable name="SignalBgColor">#012322</SetVariable>
+                                <SetVariable name="SignalRGBLowColor">#cb3433</SetVariable>
+                                <SetVariable name="SignalRGBMidColor">#00ff33</SetVariable>
+                                <SetVariable name="SignalRGBHighColor">#0034fe</SetVariable>
+                            </Template>
+                        </Children>
+                        <Connection>
+                            <ConfigKey persist="true">[Master],show_4decks</ConfigKey>
+                            <BindProperty>visible</BindProperty>
+                        </Connection>
+                    </WidgetGroup>
+                </Children>
+                <Connection>
+                    <ConfigKey>[Master],vertical_waveforms</ConfigKey>
+                    <BindProperty>visible</BindProperty>
+                    <Transform>
+                        <Not/>
+                    </Transform>
+                </Connection>
+            </WidgetGroup>
+            <WidgetGroup>
+                <Layout>horizontal</Layout>
+                <SizePolicy>me,me</SizePolicy>
+                <Children>
+                    <WidgetGroup>
+                        <ObjectName>VertBorder</ObjectName>
+                        <Layout>vertical</Layout>
+                        <SizePolicy>f,me</SizePolicy>
+                        <Size>1,</Size>
+                        <Children></Children>
+                    </WidgetGroup>
+                    <WidgetGroup>
+                        <ObjectName>VertOverview3</ObjectName>
+                        <Layout>vertical</Layout>
+                        <SizePolicy>min,me</SizePolicy>
+                        <MinimumSize>32,-1</MinimumSize>
+                        <Children>
+                            <Template src="skin:vertical_overview.xml">
+                                <SetVariable name="channum">3</SetVariable>
+                                <SetVariable name="signal_color">#09B2AE</SetVariable>
+                                <SetVariable name="SignalBgColor">#012322</SetVariable>
+                                <SetVariable name="SignalRGBLowColor">#cb3433</SetVariable>
+                                <SetVariable name="SignalRGBMidColor">#00ff33</SetVariable>
+                                <SetVariable name="SignalRGBHighColor">#0034fe</SetVariable>
+                            </Template>
+                        </Children>
+                        <Connection>
+                            <ConfigKey persist="true">[Master],show_4decks</ConfigKey>
+                            <BindProperty>visible</BindProperty>
+                        </Connection>
+                    </WidgetGroup>
+                    <WidgetGroup>
+                        <ObjectName>VertOverview1</ObjectName>
+                        <Layout>vertical</Layout>
+                        <SizePolicy>min,me</SizePolicy>
+                        <MinimumSize>32,-1</MinimumSize>
+                        <Children>
+                            <Template src="skin:vertical_overview.xml">
+                                <SetVariable name="channum">1</SetVariable>
+                                <SetVariable name="signal_color">#E7C413</SetVariable>
+                                <SetVariable name="SignalBgColor">#2f290a</SetVariable>
+                                <SetVariable name="SignalRGBLowColor">#ff2a00</SetVariable>
+                                <SetVariable name="SignalRGBMidColor">#33f600</SetVariable>
+                                <SetVariable name="SignalRGBHighColor">#332acc</SetVariable>
+                            </Template>
+                        </Children>
+                    </WidgetGroup>
+                    <WidgetGroup>
+                        <Layout>vertical</Layout>
+                        <SizePolicy>me,me</SizePolicy>
+                        <Children>
+                            <Template src="skin:vertical_spinny.xml">
+                                <SetVariable name="channum">3</SetVariable>
+                                <SetVariable name="color">2</SetVariable>
+                            </Template>
+                            <Template src="skin:vertical_waveform.xml">
+                                <SetVariable name="channum">3</SetVariable>
+                                <SetVariable name="signal_color">#09B2AE</SetVariable>
+                                <SetVariable name="SignalBgColor">#012322</SetVariable>
+                                <SetVariable name="SignalRGBLowColor">#cb3433</SetVariable>
+                                <SetVariable name="SignalRGBMidColor">#00ff33</SetVariable>
+                                <SetVariable name="SignalRGBHighColor">#0034fe</SetVariable>
+                            </Template>
+                        </Children>
+                        <Connection>
+                            <ConfigKey persist="true">[Master],show_4decks</ConfigKey>
+                            <BindProperty>visible</BindProperty>
+                        </Connection>
+                    </WidgetGroup>
+                    <WidgetGroup>
+                        <Layout>vertical</Layout>
+                        <SizePolicy>me,me</SizePolicy>
+                        <Children>
+                            <Template src="skin:vertical_spinny.xml">
+                                <SetVariable name="channum">1</SetVariable>
+                                <SetVariable name="color">1</SetVariable>
+                            </Template>
+                            <Template src="skin:vertical_waveform.xml">
+                                <SetVariable name="channum">1</SetVariable>
+                                <SetVariable name="signal_color">#E7C413</SetVariable>
+                                <SetVariable name="SignalBgColor">#2f290a</SetVariable>
+                                <SetVariable name="SignalRGBLowColor">#ff2a00</SetVariable>
+                                <SetVariable name="SignalRGBMidColor">#33f600</SetVariable>
+                                <SetVariable name="SignalRGBHighColor">#332acc</SetVariable>
+                            </Template>
+                        </Children>
+                    </WidgetGroup>
+                    <WidgetGroup>
+                        <Layout>vertical</Layout>
+                        <SizePolicy>me,me</SizePolicy>
+                        <Children>
+                            <Template src="skin:vertical_spinny.xml">
+                                <SetVariable name="channum">2</SetVariable>
+                                <SetVariable name="color">1</SetVariable>
+                            </Template>
+                            <Template src="skin:vertical_waveform.xml">
+                                <SetVariable name="channum">2</SetVariable>
+                                <SetVariable name="signal_color">#E7C413</SetVariable>
+                                <SetVariable name="SignalBgColor">#2f290a</SetVariable>
+                                <SetVariable name="SignalRGBLowColor">#ff2a00</SetVariable>
+                                <SetVariable name="SignalRGBMidColor">#33f600</SetVariable>
+                                <SetVariable name="SignalRGBHighColor">#332acc</SetVariable>
+                            </Template>
+                        </Children>
+                    </WidgetGroup>
+                    <WidgetGroup>
+                        <Layout>vertical</Layout>
+                        <SizePolicy>me,me</SizePolicy>
+                        <Children>
+                            <Template src="skin:vertical_spinny.xml">
+                                <SetVariable name="channum">4</SetVariable>
+                                <SetVariable name="color">2</SetVariable>
+                            </Template>
+                            <Template src="skin:vertical_waveform.xml">
+                                <SetVariable name="channum">4</SetVariable>
+                                <SetVariable name="signal_color">#09B2AE</SetVariable>
+                                <SetVariable name="SignalBgColor">#012322</SetVariable>
+                                <SetVariable name="SignalRGBLowColor">#cb3433</SetVariable>
+                                <SetVariable name="SignalRGBMidColor">#00ff33</SetVariable>
+                                <SetVariable name="SignalRGBHighColor">#0034fe</SetVariable>
+                            </Template>
+                        </Children>
+                        <Connection>
+                            <ConfigKey persist="true">[Master],show_4decks</ConfigKey>
+                            <BindProperty>visible</BindProperty>
+                        </Connection>
+                    </WidgetGroup>
+                    <WidgetGroup>
+                        <ObjectName>VertOverview2</ObjectName>
+                        <Layout>vertical</Layout>
+                        <SizePolicy>min,me</SizePolicy>
+                        <MinimumSize>32,-1</MinimumSize>
+                        <Children>
+                            <Template src="skin:vertical_overview.xml">
+                                <SetVariable name="channum">2</SetVariable>
+                                <SetVariable name="signal_color">#E7C413</SetVariable>
+                                <SetVariable name="SignalBgColor">#2f290a</SetVariable>
+                                <SetVariable name="SignalRGBLowColor">#ff2a00</SetVariable>
+                                <SetVariable name="SignalRGBMidColor">#33f600</SetVariable>
+                                <SetVariable name="SignalRGBHighColor">#332acc</SetVariable>
+                            </Template>
+                        </Children>
+                    </WidgetGroup>
+                    <WidgetGroup>
+                        <ObjectName>VertOverview4</ObjectName>
+                        <Layout>vertical</Layout>
+                        <SizePolicy>min,me</SizePolicy>
+                        <MinimumSize>32,-1</MinimumSize>
+                        <Children>
+                            <Template src="skin:vertical_overview.xml">
+                                <SetVariable name="channum">4</SetVariable>
+                                <SetVariable name="signal_color">#09B2AE</SetVariable>
+                                <SetVariable name="SignalBgColor">#012322</SetVariable>
+                                <SetVariable name="SignalRGBLowColor">#cb3433</SetVariable>
+                                <SetVariable name="SignalRGBMidColor">#00ff33</SetVariable>
+                                <SetVariable name="SignalRGBHighColor">#0034fe</SetVariable>
+                            </Template>
+                        </Children>
+                        <Connection>
+                            <ConfigKey persist="true">[Master],show_4decks</ConfigKey>
+                            <BindProperty>visible</BindProperty>
+                        </Connection>
+                    </WidgetGroup>
+                    <WidgetGroup>
+                        <ObjectName>VertBorder</ObjectName>
+                        <Layout>vertical</Layout>
+                        <SizePolicy>f,me</SizePolicy>
+                        <Size>1,</Size>
+                        <Children></Children>
+                    </WidgetGroup>
+                </Children>
+                <Connection>
+                    <ConfigKey>[Master],vertical_waveforms</ConfigKey>
+                    <BindProperty>visible</BindProperty>
+                </Connection>
+            </WidgetGroup>
             <WidgetGroup>
                 <ObjectName>HorizBorder</ObjectName>
                 <Layout>horizontal</Layout>
