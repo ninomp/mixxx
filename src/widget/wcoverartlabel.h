@@ -13,8 +13,8 @@ class DlgCoverArtFullSize;
 class WCoverArtLabel : public QLabel {
     Q_OBJECT
   public:
-    WCoverArtLabel(QWidget* parent = 0);
-    virtual ~WCoverArtLabel();
+    explicit WCoverArtLabel(QWidget* parent = nullptr);
+    ~WCoverArtLabel() override;
 
     void setCoverArt(const QString& trackLocation, const CoverInfo& coverInfo, QPixmap px);
 
@@ -23,14 +23,14 @@ class WCoverArtLabel : public QLabel {
     void reloadCoverArt();
 
   protected:
-    void leaveEvent(QEvent*);
-    void mousePressEvent(QMouseEvent* event);
+    void leaveEvent(QEvent* /*unused*/) override;
+    void mousePressEvent(QMouseEvent* event) override;
 
   private slots:
       void slotCoverMenu(const QPoint& pos);
 
   private:
-    CoverInfo m_coverInfo;
+    QPixmap m_loadedCover;
     WCoverArtMenu* m_pCoverMenu;
     DlgCoverArtFullSize* m_pDlgFullSize;
     QPixmap m_defaultCover;

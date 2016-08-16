@@ -9,12 +9,12 @@ namespace ModPlug {
 
 #include <vector>
 
-namespace Mixxx {
+namespace mixxx {
 
 // Class for reading tracker files using libmodplug.
 // The whole file is decoded at once and saved
 // in RAM to allow seeking and smooth operation in Mixxx.
-class SoundSourceModPlug: public Mixxx::SoundSource {
+class SoundSourceModPlug: public mixxx::SoundSource {
 public:
     static const SINT kChannelCount;
     static const SINT kSamplingRate;
@@ -24,8 +24,8 @@ public:
     static void configure(unsigned int bufferSizeLimit,
             const ModPlug::ModPlug_Settings &settings);
 
-    explicit SoundSourceModPlug(QUrl url);
-    ~SoundSourceModPlug();
+    explicit SoundSourceModPlug(const QUrl& url);
+    ~SoundSourceModPlug() override;
 
     Result parseTrackMetadataAndCoverArt(
             TrackMetadata* pTrackMetadata,
@@ -39,7 +39,7 @@ public:
             CSAMPLE* sampleBuffer) override;
 
 private:
-    Result tryOpen(const AudioSourceConfig& audioSrcCfg) override;
+    OpenResult tryOpen(const AudioSourceConfig& audioSrcCfg) override;
 
     static unsigned int s_bufferSizeLimit; // max track buffer length (bytes)
 
@@ -63,6 +63,6 @@ public:
     }
 };
 
-} // namespace Mixxx
+} // namespace mixxx
 
 #endif // MIXXX_SOUNDSOURCEMODPLUG_H

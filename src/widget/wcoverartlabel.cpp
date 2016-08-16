@@ -37,8 +37,9 @@ WCoverArtLabel::~WCoverArtLabel() {
 void WCoverArtLabel::setCoverArt(const QString& trackLocation, const CoverInfo& coverInfo, QPixmap px) {
     qDebug() << "WCoverArtLabel::setCoverArt" << coverInfo << px.size();
 
-    m_coverInfo = coverInfo;
+    m_loadedCover = px;
     m_pCoverMenu->setCoverArt(trackLocation, coverInfo);
+
 
     if (px.isNull()) {
         setPixmap(m_defaultCover);
@@ -66,11 +67,11 @@ void WCoverArtLabel::mousePressEvent(QMouseEvent* event) {
         if (m_pDlgFullSize->isVisible()) {
             m_pDlgFullSize->close();
         } else {
-            m_pDlgFullSize->init(m_coverInfo);
+            m_pDlgFullSize->init(m_loadedCover);
         }
     }
 }
 
-void WCoverArtLabel::leaveEvent(QEvent*) {
+void WCoverArtLabel::leaveEvent(QEvent* /*unused*/) {
     m_pDlgFullSize->close();
 }

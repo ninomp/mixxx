@@ -18,12 +18,12 @@
 #include "AudioFormat.h"
 #endif
 
-namespace Mixxx {
+namespace mixxx {
 
-class SoundSourceCoreAudio : public Mixxx::SoundSource {
+class SoundSourceCoreAudio : public mixxx::SoundSource {
 public:
     explicit SoundSourceCoreAudio(QUrl url);
-    ~SoundSourceCoreAudio();
+    ~SoundSourceCoreAudio() override;
 
     void close() override;
 
@@ -33,7 +33,7 @@ public:
             CSAMPLE* sampleBuffer) override;
 
 private:
-    Result tryOpen(const AudioSourceConfig& audioSrcCfg) override;
+    OpenResult tryOpen(const AudioSourceConfig& audioSrcCfg) override;
 
     bool m_bFileIsMp3;
     ExtAudioFileRef m_audioFile;
@@ -53,6 +53,6 @@ public:
     }
 };
 
-}  // namespace Mixxx
+}  // namespace mixxx
 
 #endif // SOUNDSOURCECOREAUDIO_H

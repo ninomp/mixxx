@@ -2,7 +2,7 @@
 
 #include "track/trackmetadatataglib.h"
 
-namespace Mixxx {
+namespace mixxx {
 
 /*static*/ QString SoundSource::getFileExtensionFromUrl(const QUrl& url) {
     return url.toString().section(".", -1).toLower().trimmed();
@@ -21,17 +21,21 @@ SoundSource::SoundSource(const QUrl& url, const QString& type)
     DEBUG_ASSERT(getUrl().isValid());
 }
 
-Result SoundSource::open(const AudioSourceConfig& audioSrcCfg) {
+SoundSource::OpenResult SoundSource::open(const AudioSourceConfig& audioSrcCfg) {
     close(); // reopening is not supported
-    Result result;
+
+    OpenResult result;
     try {
         result = tryOpen(audioSrcCfg);
+    } catch (const std::exception& e) {
+        qWarning() << "Caught unexpected exception from SoundSource::tryOpen():" << e.what();
+        result = OpenResult::FAILED;
     } catch (...) {
-        close();
-        throw;
+        qWarning() << "Caught unknown exception from SoundSource::tryOpen()";
+        result = OpenResult::FAILED;
     }
-    if (OK != result) {
-        close();
+    if (OpenResult::SUCCEEDED != result) {
+        close(); // rollback
     }
     return result;
 }
@@ -47,4 +51,4 @@ Result SoundSource::writeTrackMetadata(
     return writeTrackMetadataIntoFile(trackMetadata, getLocalFileName());
 }
 
-} //namespace Mixxx
+} //namespace mixxx

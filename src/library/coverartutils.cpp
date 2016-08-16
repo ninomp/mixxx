@@ -3,7 +3,7 @@
 
 #include "library/coverartutils.h"
 
-#include "soundsourceproxy.h"
+#include "sources/soundsourceproxy.h"
 #include "util/regex.h"
 
 
@@ -40,7 +40,7 @@ QImage CoverArtUtils::extractEmbeddedCover(
     // TODO(uklotzde): Resolve the TrackPointer from the track cache
     // to avoid accessing reading the file while it is written.
     TrackPointer pTrack(
-            TrackInfoObject::newTemporary(fileInfo, pToken));
+            Track::newTemporary(fileInfo, pToken));
     return SoundSourceProxy(pTrack).parseCoverImage();
 }
 
@@ -95,6 +95,7 @@ CoverArt CoverArtUtils::guessCoverArt(TrackPointer pTrack) {
     const QFileInfo fileInfo(pTrack->getFileInfo());
     art.image = extractEmbeddedCover(fileInfo, pTrack->getSecurityToken());
     if (!art.image.isNull()) {
+        // TODO() here we my introduce a duplicate hash code
         art.info.hash = calculateHash(art.image);
         art.info.coverLocation = QString();
         art.info.type = CoverInfo::METADATA;
@@ -136,7 +137,7 @@ QLinkedList<QFileInfo> CoverArtUtils::findPossibleCoversInFolder(const QString& 
 
 //static
 CoverArt CoverArtUtils::selectCoverArtForTrack(
-        TrackInfoObject* pTrack,
+        Track* pTrack,
         const QLinkedList<QFileInfo>& covers) {
     if (pTrack == NULL || covers.isEmpty()) {
         CoverArt art;
@@ -217,6 +218,7 @@ CoverArt CoverArtUtils::selectCoverArtForTrack(
         if (!art.image.isNull()) {
             art.info.source = CoverInfo::GUESSED;
             art.info.type = CoverInfo::FILE;
+            // TODO() here we may introduce a duplicate hash code
             art.info.hash = CoverArtUtils::calculateHash(art.image);
             art.info.coverLocation = bestInfo->fileName();
             return art;
