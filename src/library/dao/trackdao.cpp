@@ -1088,7 +1088,9 @@ bool setTrackUrl(const QSqlRecord& record, const int column,
 
 bool setTrackDuration(const QSqlRecord& record, const int column,
                       TrackPointer pTrack) {
-    pTrack->setDuration(record.value(column).toDouble());
+    double duration = record.value(column).toDouble();
+    pTrack->setDuration(duration);
+    pTrack->setPreviousDuration(duration);
     return false;
 }
 

@@ -373,6 +373,15 @@ void Track::setDateAdded(const QDateTime& dateAdded) {
     m_dateAdded = dateAdded;
 }
 
+void Track::setPreviousDuration(double previousDuration) {
+    QMutexLocker lock(&m_qMutex);
+    m_previousDuration = previousDuration;
+}
+
+double Track::getPreviousDuration() const {
+    return m_previousDuration;
+}
+
 void Track::setDuration(double duration) {
     QMutexLocker lock(&m_qMutex);
     if (m_metadata.getDuration() != duration) {
@@ -682,6 +691,11 @@ ConstWaveformPointer Track::getWaveformSummary() const {
 void Track::setWaveformSummary(ConstWaveformPointer pWaveform) {
     m_pWaveformSummary = pWaveform;
     emit(waveformSummaryUpdated());
+}
+
+bool Track::hasDurationChanged() const {
+    qDebug() << "Track::hasDurationChanged()  duration" << getDuration() << "previous duration" << getPreviousDuration();
+    return getDuration() != getPreviousDuration();
 }
 
 bool Track::isClearWaveformRequested() const {

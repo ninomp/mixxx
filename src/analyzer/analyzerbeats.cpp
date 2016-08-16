@@ -107,6 +107,10 @@ bool AnalyzerBeats::initialize(TrackPointer tio, int sampleRate, int totalSample
 }
 
 bool AnalyzerBeats::isDisabledOrLoadStoredSuccess(TrackPointer tio) const {
+    if (tio->hasDurationChanged()) {
+        return false;
+    }
+
     int iMinBpm;
     int iMaxBpm;
 

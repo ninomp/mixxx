@@ -77,6 +77,10 @@ bool AnalyzerKey::initialize(TrackPointer tio, int sampleRate, int totalSamples)
 }
 
 bool AnalyzerKey::isDisabledOrLoadStoredSuccess(TrackPointer tio) const {
+    if (tio->hasDurationChanged()) {
+        return false;
+    }
+
     bool bPreferencesFastAnalysisEnabled = static_cast<bool>(
         m_pConfig->getValueString(
             ConfigKey(KEY_CONFIG_KEY, KEY_FAST_ANALYSIS)).toInt());

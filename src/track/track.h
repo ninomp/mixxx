@@ -117,6 +117,9 @@ class Track : public QObject {
     // Returns the bitrate as a string
     QString getBitrateText() const;
 
+    void setPreviousDuration(double previousDuration);
+    double getPreviousDuration() const;
+
     void setDuration(double duration);
     double getDuration() const {
         return getDuration(DurationRounding::NONE);
@@ -239,6 +242,8 @@ class Track : public QObject {
 
     ConstWaveformPointer getWaveformSummary() const;
     void setWaveformSummary(ConstWaveformPointer pWaveform);
+
+    bool hasDurationChanged() const;
 
     bool isClearWaveformRequested() const;
     void setClearWaveformRequested(bool);
@@ -394,6 +399,8 @@ class Track : public QObject {
     PlayCounter m_playCounter;
 
     Keys m_keys;
+
+    double m_previousDuration;
 
     // Various boolean flags. Please refer to the corresponding
     // setter/getter functions for detailed information about

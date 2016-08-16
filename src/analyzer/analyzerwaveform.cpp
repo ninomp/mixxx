@@ -106,7 +106,7 @@ bool AnalyzerWaveform::initialize(TrackPointer tio, int sampleRate, int totalSam
 bool AnalyzerWaveform::isDisabledOrLoadStoredSuccess(TrackPointer tio) const {
     TrackId trackId = tio->getId();
 
-    if (tio->isClearWaveformRequested()) {
+    if (tio->isClearWaveformRequested() || tio->hasDurationChanged()) {
         bool success = m_pAnalysisDao->deleteAnalysesForTrack(trackId);
         qDebug() << (success ? "Successfully deleted" : "Failed to delete")
                  << "waveform analysis for trackId" << trackId;
