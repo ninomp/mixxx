@@ -6,6 +6,7 @@
 
 #include "library/basesqltablemodel.h"
 
+#include "library/overviewdelegate.h"
 #include "library/coverartdelegate.h"
 #include "library/stardelegate.h"
 #include "library/starrating.h"
@@ -108,6 +109,8 @@ void BaseSqlTableModel::initHeaderData() {
                         tr("Cover Art"), 90);
     setHeaderProperties(ColumnCache::COLUMN_LIBRARYTABLE_REPLAYGAIN,
                         tr("ReplayGain"), 50);
+    setHeaderProperties(ColumnCache::COLUMN_LIBRARYTABLE_WAVESUMMARYHEX,
+                        tr("Overview"), 100);
 }
 
 QSqlDatabase BaseSqlTableModel::database() const {
@@ -777,7 +780,8 @@ Qt::ItemFlags BaseSqlTableModel::readWriteFlags(
             column == fieldIndex(ColumnCache::COLUMN_LIBRARYTABLE_BITRATE) ||
             column == fieldIndex(ColumnCache::COLUMN_LIBRARYTABLE_DATETIMEADDED) ||
             column == fieldIndex(ColumnCache::COLUMN_LIBRARYTABLE_COVERART) ||
-            column == fieldIndex(ColumnCache::COLUMN_LIBRARYTABLE_REPLAYGAIN)) {
+            column == fieldIndex(ColumnCache::COLUMN_LIBRARYTABLE_REPLAYGAIN) ||
+            column == fieldIndex(ColumnCache::COLUMN_LIBRARYTABLE_WAVESUMMARYHEX)) {
         return defaultFlags;
     } else if (column == fieldIndex(ColumnCache::COLUMN_LIBRARYTABLE_TIMESPLAYED))  {
         return defaultFlags | Qt::ItemIsUserCheckable;
@@ -1028,6 +1032,8 @@ QAbstractItemDelegate* BaseSqlTableModel::delegateForColumn(const int i, QObject
         connect(pCoverDelegate, SIGNAL(coverReadyForCell(int, int)),
                 this, SLOT(refreshCell(int, int)));
         return pCoverDelegate;
+    } else if (i == fieldIndex(ColumnCache::COLUMN_LIBRARYTABLE_WAVESUMMARYHEX)) {
+        return new OverviewDelegate(pParent);
     }
     return NULL;
 }
