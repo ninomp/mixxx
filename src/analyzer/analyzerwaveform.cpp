@@ -2,6 +2,7 @@
 
 #include "analyzer/analyzertrack.h"
 #include "engine/filters/enginefilterbessel4.h"
+#include "library/overviewcache.h"
 #include "track/track.h"
 #include "util/logger.h"
 #include "waveform/waveformfactory.h"
@@ -298,6 +299,8 @@ void AnalyzerWaveform::storeResults(TrackPointer tio) {
             tio->getId(),
             m_waveform,
             m_waveformSummary);
+
+    OverviewCache::instance()->onTrackSummaryChanged(tio->getId());
 
     kLogger.debug() << "Waveform generation for track" << tio->getId() << "done"
                     << m_timer.elapsed().debugSecondsWithUnit();

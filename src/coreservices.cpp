@@ -17,6 +17,7 @@
 #include "library/coverartcache.h"
 #include "library/library.h"
 #include "library/library_prefs.h"
+#include "library/overviewcache.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
 #include "mixer/playerinfo.h"
@@ -40,6 +41,7 @@
 #include "util/translations.h"
 #include "util/versionstore.h"
 #include "vinylcontrol/vinylcontrolmanager.h"
+#include "waveform/overviews/waveformoverviewrenderer.h"
 
 #ifdef __APPLE__
 #include "util/sandbox.h"
@@ -337,6 +339,10 @@ void CoreServices::initialize(QApplication* pApp) {
     emit initializationProgressUpdate(50, tr("library"));
     CoverArtCache::createInstance();
     Clipboard::createInstance();
+    WaveformOverviewRenderer::createInstance();
+    OverviewCache::createInstance();
+    OverviewCache::instance()->setConfig(pConfig);
+    OverviewCache::instance()->setDbConnectionPool(m_pDbConnectionPool);
 
     m_pTrackCollectionManager = std::make_shared<TrackCollectionManager>(
             this,
