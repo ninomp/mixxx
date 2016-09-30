@@ -9,6 +9,7 @@
 #include <QAtomicInt>
 #include <QSharedPointer>
 #include <QMutexLocker>
+#include <QImage>
 
 #include "util/class.h"
 #include "util/compatibility.h"
@@ -68,6 +69,8 @@ class Waveform {
     }
 
     QByteArray toByteArray() const;
+
+    QImage renderToImage() const;
 
     // We do not lock the mutex since m_dataSize and m_visualSampleRate are not
     // changed after the constructor runs.

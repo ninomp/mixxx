@@ -84,6 +84,7 @@ void PreviewButtonDelegate::paint(QPainter *painter,
         return;
     }
 
+    /*
     m_pButton->setGeometry(option.rect);
     bool playing = m_pPreviewDeckPlay->toBool();
     // Check-state is whether the track is loaded (index.data()) and whether
@@ -99,6 +100,18 @@ void PreviewButtonDelegate::paint(QPainter *painter,
     painter->translate(option.rect.topLeft());
     m_pButton->render(painter);
     painter->restore();
+    */
+
+    TrackModel *pTrackModel = dynamic_cast<TrackModel*>(m_pTableView->model());
+    if (pTrackModel) {
+        TrackPointer pTrack = pTrackModel->getTrack(m_currentEditedCellIndex);
+        if (pTrack) {
+            ConstWaveformPointer pWaveform = pTrack->getWaveform();
+            if (pWaveform) {
+                painter->drawImage(option.rect, pWaveform->renderToImage());
+            }
+        }
+    }
 }
 
 void PreviewButtonDelegate::updateEditorGeometry(QWidget *editor,

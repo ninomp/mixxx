@@ -1,5 +1,7 @@
 #include <QtDebug>
+#include <QPainter>
 
+#include "util/math.h"
 #include "waveform/waveform.h"
 #include "proto/waveform.pb.h"
 
@@ -194,6 +196,51 @@ void Waveform::readByteArray(const QByteArray& data) {
     }
     m_completion = dataSize;
     m_bDirty = false;
+}
+
+QImage Waveform::renderToImage() const {
+    const int dataSize = getDataSize();
+    if (dataSize <= 0) {
+        return QImage();
+    }
+
+    QImage image(dataSize / 2, 2 * 255, QImage::Format_ARGB32_Premultiplied);
+    image.fill(QColor(0,0,0,0).value());
+
+    QPainter painter(&image);
+    painter.translate(0.0, static_cast<double>(image.height()) / 2.0);
+
+    QColor color;
+
+    for (int i = 0, x = 0; i < dataSize; i += 2, ++x) {
+        unsigned char all = getAll(i);
+        unsigned char low = getLow(i);
+        unsigned char mid = getMid(i);
+        unsigned char high = getHigh(i);
+        unsigned char max = math_max3(low, mid, high);
+        qreal maxF = static_cast<qreal>(max);
+
+        if (maxF > 0.0) {
+            color.setRgbF(low / maxF, mid / maxF, high / maxF);
+            painter.setPen(color);
+            painter.drawLine(x, -all, x, 0);
+        }
+
+        all = getAll(i + 1);
+        low = getLow(i + 1);
+        mid = getMid(i + 1);
+        high = getHigh(i + 1);
+        max = math_max3(low, mid, high);
+        maxF = static_cast<qreal>(max);
+
+        if (maxF > 0.0) {
+            color.setRgbF(low / maxF, mid / maxF, high / maxF);
+            painter.setPen(color);
+            painter.drawLine(x, 0, x, all);
+        }
+    }
+
+    return image;
 }
 
 void Waveform::resize(int size) {
