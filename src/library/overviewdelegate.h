@@ -1,9 +1,9 @@
 #ifndef OVERVIEWDELEGATE_H
 #define OVERVIEWDELEGATE_H
 
-#include <QObject>
-#include <QPainter>
 #include <QStyledItemDelegate>
+#include <QPainter>
+#include <QTableView>
 
 class OverviewDelegate : public QStyledItemDelegate {
     Q_OBJECT
@@ -11,9 +11,12 @@ class OverviewDelegate : public QStyledItemDelegate {
     explicit OverviewDelegate(QObject* parent = nullptr);
     virtual ~OverviewDelegate();
 
-    /*void paint(QPainer* painter,
+    void paint(QPainter* painter,
                const QStyleOptionViewItem& option,
-               const QModelIndex& index) override;*/
+               const QModelIndex& index) const;
+
+  private:
+    QTableView* m_pTableView;
 };
 
 #endif // OVERVIEWDELEGATE_H
