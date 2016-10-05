@@ -1,21 +1,42 @@
 #ifndef OVERVIEWCACHE_H
 #define OVERVIEWCACHE_H
 
+#include "util/singleton.h"
+#include "track/track.h"
 
-class OverviewCache : public QObject, public Singleton<CoverArtCache> {
+class OverviewCache : public QObject, public Singleton<OverviewCache> {
     Q_OBJECT
-public:
-    void requestOverview(const Track* pTrack);
+  public:
+    QPixmap requestOverview(const TrackId trackId,
+                            const QObject* pRequestor,
+                            const int desiredWidth);
 
-public slots:
+    struct FutureResult {
+        FutureResult()
+            : requestor(nullptr) {
+        }
 
-signals:
-    void overviewGenerated(QImage);
+        TrackId trackId;
+        QImage image;
+        const QObject* requestor;
+    };
 
-protected:
+  public slots:
+    void overviewPrepared();
+
+  signals:
+    void overviewReady(const QObject* pRequestor,
+                       TrackId trackId,
+                       QPixmap pixmap);
+
+  protected:
     OverviewCache();
     virtual ~OverviewCache();
     friend class Singleton<OverviewCache>;
+
+    FutureResult prepareOverview(const TrackId trackId,
+                                 const QObject* pRequestor,
+                                 const int desiredWidth);
 };
 
 #endif // OVERVIEWCACHE_H

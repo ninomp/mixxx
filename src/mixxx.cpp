@@ -33,6 +33,7 @@
 #include "effects/effectsmanager.h"
 #include "effects/native/nativebackend.h"
 #include "library/coverartcache.h"
+#include "library/overviewcache.h"
 #include "library/library.h"
 #include "library/library_preferences.h"
 #include "controllers/controllermanager.h"
@@ -261,6 +262,7 @@ void MixxxMainWindow::initialize(QApplication* pApp, const CmdlineArgs& args) {
 #endif
 
     CoverArtCache::create();
+    OverviewCache::create();
 
     // (long)
     m_pLibrary = new Library(this, pConfig,
@@ -492,6 +494,8 @@ void MixxxMainWindow::finalize() {
 
     // CoverArtCache is fairly independent of everything else.
     CoverArtCache::destroy();
+
+    OverviewCache::destroy();
 
     // Delete the library after the view so there are no dangling pointers to
     // the data models.

@@ -17,6 +17,7 @@ class OverviewDelegate : public QStyledItemDelegate {
 
   private:
     QTableView* m_pTableView;
+    int m_iIdColumn;
 };
 
 #endif // OVERVIEWDELEGATE_H
