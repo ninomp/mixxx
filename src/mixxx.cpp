@@ -263,6 +263,7 @@ void MixxxMainWindow::initialize(QApplication* pApp, const CmdlineArgs& args) {
 
     CoverArtCache::create();
     OverviewCache::create();
+    OverviewCache::instance()->initialize(pConfig);
 
     // (long)
     m_pLibrary = new Library(this, pConfig,

@@ -62,6 +62,7 @@ QPixmap OverviewCache::requestOverview(const TrackId trackId,
         return pixmap;
     }
 
+    /*
     QFutureWatcher<FutureResult>* watcher = new QFutureWatcher<FutureResult>(this);
     QFuture<FutureResult> future = QtConcurrent::run(
                 this, &OverviewCache::prepareOverview, trackId, pRequestor, desiredWidth);
@@ -69,6 +70,48 @@ QPixmap OverviewCache::requestOverview(const TrackId trackId,
     watcher->setFuture(future);
 
     return QPixmap();
+    */
+
+    ConstWaveformPointer pLoadedTrackWaveformSummary;
+    QList<AnalysisDao::AnalysisInfo> analyses =
+            m_pAnalysisDao->getAnalysesForTrackByType(trackId, AnalysisDao::AnalysisType::TYPE_WAVESUMMARY);
+
+    if (analyses.size() != 1) {
+        return QPixmap();
+    }
+
+    /*
+    QListIterator<AnalysisDao::AnalysisInfo> it(analyses);
+    while (it.hasNext()) {
+        const AnalysisDao::AnalysisInfo& analysis = it.next();
+        pLoadedTrackWaveformSummary = ConstWaveformPointer(
+                WaveformFactory::loadWaveformFromAnalysis(analysis));
+    }
+    */
+    pLoadedTrackWaveformSummary = ConstWaveformPointer(
+                WaveformFactory::loadWaveformFromAnalysis(analyses[0]));
+
+    if (!pLoadedTrackWaveformSummary.isNull() && !pLoadedTrackWaveformSummary->isValid()) {
+        return QPixmap();
+    }
+
+    QImage image = pLoadedTrackWaveformSummary->renderToImage();
+
+    if (!image.isNull() && desiredWidth > 0) {
+        image = resizeImageWidth(image, desiredWidth);
+    }
+
+    // Create pixmap, GUI thread only
+    /*QPixmap*/ pixmap = QPixmap::fromImage(image);
+    if (!pixmap.isNull() && desiredWidth != 0) {
+        // we have to be sure that res.cover.hash is unique
+        // because insert replaces the images with the same key
+        QString cacheKey = pixmapCacheKey(
+                trackId, desiredWidth);
+        QPixmapCache::insert(cacheKey, pixmap);
+    }
+
+    return pixmap;
 }
 
 OverviewCache::FutureResult OverviewCache::prepareOverview(
