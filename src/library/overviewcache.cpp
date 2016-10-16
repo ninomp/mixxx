@@ -9,8 +9,10 @@
 #include "waveform/waveformfactory.h"
 
 namespace {
-    QString pixmapCacheKey(TrackId trackId, int width) {
-        return QString("Overview_%1_%2").arg(trackId.toInt()).arg(width);
+    QString pixmapCacheKey(TrackId trackId, QSize size) {
+        //return QString("Overview_%1").arg(trackId.toInt());
+        //return QString("Overview_%1_%2").arg(trackId.toInt()).arg(width);
+        return QString("Overview_%1_%2_%3").arg(trackId.toInt()).arg(size.width()).arg(size.height());
     }
 
     // The transformation mode when scaling images
@@ -19,6 +21,10 @@ namespace {
     // Resizes the image (preserving aspect ratio) to width.
     inline QImage resizeImageWidth(const QImage& image, int width) {
         return image.scaledToWidth(width, kTransformationMode);
+    }
+
+    inline QImage resizeImageSize(const QImage& image, QSize size) {
+        return image.scaled(size, Qt::IgnoreAspectRatio, kTransformationMode);
     }
 }  // anonymous namespace
 
@@ -50,28 +56,27 @@ void OverviewCache::initialize(UserSettingsPointer pConfig) {
 
 QPixmap OverviewCache::requestOverview(const TrackId trackId,
                                        const QObject *pRequestor,
-                                       const int desiredWidth) {
+                                       const QSize desiredSize) {
     if (!trackId.isValid()) {
         return QPixmap();
     }
 
-    QString cacheKey = pixmapCacheKey(trackId, desiredWidth);
+    QString cacheKey = pixmapCacheKey(trackId, desiredSize);
 
     QPixmap pixmap;
     if (QPixmapCache::find(cacheKey, &pixmap)) {
         return pixmap;
     }
 
-    /*
     QFutureWatcher<FutureResult>* watcher = new QFutureWatcher<FutureResult>(this);
     QFuture<FutureResult> future = QtConcurrent::run(
-                this, &OverviewCache::prepareOverview, trackId, pRequestor, desiredWidth);
+                this, &OverviewCache::prepareOverview, trackId, pRequestor, desiredSize);
     connect(watcher, SIGNAL(finished()), this, SLOT(overviewPrepared()));
     watcher->setFuture(future);
 
     return QPixmap();
-    */
 
+    /*
     ConstWaveformPointer pLoadedTrackWaveformSummary;
     QList<AnalysisDao::AnalysisInfo> analyses =
             m_pAnalysisDao->getAnalysesForTrackByType(trackId, AnalysisDao::AnalysisType::TYPE_WAVESUMMARY);
@@ -79,6 +84,7 @@ QPixmap OverviewCache::requestOverview(const TrackId trackId,
     if (analyses.size() != 1) {
         return QPixmap();
     }
+    */
 
     /*
     QListIterator<AnalysisDao::AnalysisInfo> it(analyses);
@@ -88,6 +94,7 @@ QPixmap OverviewCache::requestOverview(const TrackId trackId,
                 WaveformFactory::loadWaveformFromAnalysis(analysis));
     }
     */
+    /*
     pLoadedTrackWaveformSummary = ConstWaveformPointer(
                 WaveformFactory::loadWaveformFromAnalysis(analyses[0]));
 
@@ -102,7 +109,7 @@ QPixmap OverviewCache::requestOverview(const TrackId trackId,
     }
 
     // Create pixmap, GUI thread only
-    /*QPixmap*/ pixmap = QPixmap::fromImage(image);
+    /*QPixmap*/ /*pixmap = QPixmap::fromImage(image);
     if (!pixmap.isNull() && desiredWidth != 0) {
         // we have to be sure that res.cover.hash is unique
         // because insert replaces the images with the same key
@@ -111,13 +118,13 @@ QPixmap OverviewCache::requestOverview(const TrackId trackId,
         QPixmapCache::insert(cacheKey, pixmap);
     }
 
-    return pixmap;
+    return pixmap;*/
 }
 
 OverviewCache::FutureResult OverviewCache::prepareOverview(
         const TrackId trackId,
         const QObject *pRequestor,
-        const int desiredWidth) {
+        const QSize desiredSize) {
     ConstWaveformPointer pLoadedTrackWaveformSummary;
     QList<AnalysisDao::AnalysisInfo> analyses =
             m_pAnalysisDao->getAnalysesForTrackByType(trackId, AnalysisDao::AnalysisType::TYPE_WAVESUMMARY);
@@ -129,17 +136,22 @@ OverviewCache::FutureResult OverviewCache::prepareOverview(
                 WaveformFactory::loadWaveformFromAnalysis(analysis));
     }
 
-    QImage image = pLoadedTrackWaveformSummary->renderToImage();
+    QImage image;
 
-    if (!image.isNull() && desiredWidth > 0) {
-        image = resizeImageWidth(image, desiredWidth);
+    if (!pLoadedTrackWaveformSummary.isNull() && pLoadedTrackWaveformSummary->isValid()) {
+        image = pLoadedTrackWaveformSummary->renderToImage();
+
+        if (!image.isNull() && !desiredSize.isEmpty()) {
+            //image = resizeImageWidth(image, desiredWidth);
+            image = resizeImageSize(image, desiredSize);
+        }
     }
 
     FutureResult result;
     result.trackId = trackId;
     result.requestor = pRequestor;
     result.image = image;
-    result.resizedToWidth = desiredWidth;
+    result.resizedToSize = desiredSize;
     return result;
 }
 
@@ -150,13 +162,13 @@ void OverviewCache::overviewPrepared() {
 
     // Create pixmap, GUI thread only
     QPixmap pixmap = QPixmap::fromImage(res.image);
-    if (!pixmap.isNull() && res.resizedToWidth != 0) {
+    if (!pixmap.isNull() && !res.resizedToSize.isEmpty()) {
         // we have to be sure that res.cover.hash is unique
         // because insert replaces the images with the same key
         QString cacheKey = pixmapCacheKey(
-                res.trackId, res.resizedToWidth);
+                res.trackId, res.resizedToSize);
         QPixmapCache::insert(cacheKey, pixmap);
     }
 
-    emit(overviewReady(res.requestor, res.trackId, pixmap, res.resizedToWidth));
+    emit(overviewReady(res.requestor, res.trackId, pixmap, res.resizedToSize));
 }

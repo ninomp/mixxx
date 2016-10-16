@@ -16,17 +16,17 @@ class OverviewCache : public QObject, public Singleton<OverviewCache> {
 
     QPixmap requestOverview(const TrackId trackId,
                             const QObject* pRequestor,
-                            const int desiredWidth);
+                            const QSize desiredSize);
 
     struct FutureResult {
         FutureResult()
-            : resizedToWidth(0),
+            : /*resizedToWidth(0),*/
               requestor(nullptr) {
         }
 
         TrackId trackId;
         QImage image;
-        int resizedToWidth;
+        QSize resizedToSize;
         const QObject* requestor;
     };
 
@@ -37,7 +37,7 @@ class OverviewCache : public QObject, public Singleton<OverviewCache> {
     void overviewReady(const QObject* pRequestor,
                        TrackId trackId,
                        QPixmap pixmap,
-                       int resizedToWidth);
+                       QSize resizedToSize);
 
   protected:
     OverviewCache();
@@ -46,7 +46,7 @@ class OverviewCache : public QObject, public Singleton<OverviewCache> {
 
     FutureResult prepareOverview(const TrackId trackId,
                                  const QObject* pRequestor,
-                                 const int desiredWidth);
+                                 const QSize desiredSize);
 
   private:
     QSqlDatabase m_database;

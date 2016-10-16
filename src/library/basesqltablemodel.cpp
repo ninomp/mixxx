@@ -1033,7 +1033,10 @@ QAbstractItemDelegate* BaseSqlTableModel::delegateForColumn(const int i, QObject
                 this, SLOT(refreshCell(int, int)));
         return pCoverDelegate;
     } else if (i == fieldIndex(ColumnCache::COLUMN_LIBRARYTABLE_WAVESUMMARYHEX)) {
-        return new OverviewDelegate(pParent);
+        OverviewDelegate* pOverviewDelegate = new OverviewDelegate(pParent);
+        connect(pOverviewDelegate, SIGNAL(overviewReadyForCell(int,int)),
+                this, SLOT(refreshCell(int,int)));
+        return pOverviewDelegate;
     }
     return NULL;
 }
