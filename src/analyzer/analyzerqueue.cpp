@@ -8,6 +8,7 @@
 #ifdef __VAMP__
 #include "analyzer/analyzerbeats.h"
 #include "analyzer/analyzerkey.h"
+#include "analyzer/analyzersilence.h"
 #include "analyzer/vamp/vampanalyzer.h"
 #endif
 #include "analyzer/analyzergain.h"
@@ -446,6 +447,7 @@ AnalyzerQueue* AnalyzerQueue::createDefaultAnalyzerQueue(
     VampAnalyzer::initializePluginPaths();
     ret->addAnalyzer(new AnalyzerBeats(pConfig));
     ret->addAnalyzer(new AnalyzerKey(pConfig));
+    ret->addAnalyzer(new AnalyzerSilence(pConfig));
 #endif
 
     ret->start(QThread::LowPriority);
@@ -466,6 +468,7 @@ AnalyzerQueue* AnalyzerQueue::createAnalysisFeatureAnalyzerQueue(
     VampAnalyzer::initializePluginPaths();
     ret->addAnalyzer(new AnalyzerBeats(pConfig));
     ret->addAnalyzer(new AnalyzerKey(pConfig));
+    ret->addAnalyzer(new AnalyzerSilence(pConfig));
 #endif
 
     ret->start(QThread::LowPriority);

@@ -9,6 +9,7 @@ Import('build')
 Import('mixxxminimal_depends')
 
 mixxxminimal_sources = [
+	"aubio/fvec.c",
 	"base/Pitch.cpp",
 	"dsp/chromagram/Chromagram.cpp",
 	"dsp/chromagram/ConstantQ.cpp",
@@ -39,6 +40,7 @@ mixxxminimal_sources = [
 	"plugins/BeatTrack.cpp",
 	"plugins/TonalChangeDetect.cpp",
 	"plugins/MixxxBpmDetection.cpp",
+	"plugins/Silence.cpp",
 	"libmain.cpp",
 ]
 

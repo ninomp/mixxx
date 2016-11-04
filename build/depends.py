@@ -741,6 +741,7 @@ class MixxxCore(Feature):
                    "analyzer/analyzerwaveform.cpp",
                    "analyzer/analyzergain.cpp",
                    "analyzer/analyzerebur128.cpp",
+                   "analyzer/analyzersilence.cpp",
 
                    "controllers/controller.cpp",
                    "controllers/controllerengine.cpp",
