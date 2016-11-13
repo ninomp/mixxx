@@ -18,8 +18,8 @@
 
 */
 
-#include "config.h"
-#include "aubio_priv.h"
+#include "../config.h"
+#include "../aubio_priv.h"
 #include "log.h"
 
 /** array of pointers to logging functions, one per level */

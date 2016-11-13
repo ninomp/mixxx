@@ -9,7 +9,9 @@ Import('build')
 Import('mixxxminimal_depends')
 
 mixxxminimal_sources = [
-	"aubio/fvec.c",
+        "aubio/fvec.c",
+        "aubio/mathutils.c",
+        "aubio/utils/log.c",
 	"base/Pitch.cpp",
 	"dsp/chromagram/Chromagram.cpp",
 	"dsp/chromagram/ConstantQ.cpp",

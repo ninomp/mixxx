@@ -20,6 +20,12 @@ class AnalyzerSilence : public Analyzer {
     UserSettingsPointer m_pConfig;
     VampAnalyzer* m_pVamp;
     //QString m_pluginId;
+    QList<int> m_NonSilentBegin;
+    QList<int> m_NonSilentEnd;
+    float m_fThreshold;
+    bool m_bPrevSilence;
+    int m_iSampleRate;
+    int m_iSamplesProcessed;
 };
 
 #endif // ANALYZER_ANALYZERSILENCE_H
