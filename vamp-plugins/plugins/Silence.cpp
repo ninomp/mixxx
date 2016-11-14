@@ -109,13 +109,15 @@ Silence::reset()
 size_t
 Silence::getPreferredStepSize() const
 {
-    return 1024;
+    //return 1024;
+    return 4096;
 }
 
 size_t
 Silence::getPreferredBlockSize() const
 {
-    return 1024;
+    //return 1024;
+    return 4096;
 }
 
 Silence::ParameterList

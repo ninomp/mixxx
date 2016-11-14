@@ -25,7 +25,8 @@ class AnalyzerSilence : public Analyzer {
     float m_fThreshold;
     bool m_bPrevSilence;
     int m_iSampleRate;
-    int m_iSamplesProcessed;
+    int m_iTotalSamples;
+    int m_iFramesProcessed;
 };
 
 #endif // ANALYZER_ANALYZERSILENCE_H
