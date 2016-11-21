@@ -28,6 +28,7 @@ bool AnalyzerSilence::initialize(TrackPointer tio, int sampleRate, int totalSamp
 
     if (success) {
         qDebug() << "Silence detection started with plugin" << pluginID;
+        m_pVamp->SetParameter("silencethreshold", m_fThreshold);
     } else {
         qDebug() << "Silence detection will not start";
     }
@@ -82,8 +83,8 @@ void AnalyzerSilence::process(const CSAMPLE *pIn, const int iLen) {
     computeStereoRMS(&rmsL, &rmsR, pIn, iLen);
     CSAMPLE rms = math_min(rmsL, rmsR);
     double dB = 10.0f * log10(rms);
-    double dB_l = 10.0f * log10(rmsL);
-    double dB_r = 10.0f * log10(rmsR);
+    //double dB_l = 10.0f * log10(rmsL);
+    //double dB_r = 10.0f * log10(rmsR);
     bool silence = dB < m_fThreshold;
     /*qDebug() << "Silence detect"
              << "start frame" << m_iFramesProcessed
@@ -122,13 +123,13 @@ void AnalyzerSilence::cleanup(TrackPointer tio) {
 void AnalyzerSilence::finalize(TrackPointer tio) {
     QStringList sl1;
     foreach (int value, m_NonSilentBegin) {
-        sl1 << QString::number((double) value / (double) m_iSampleRate);
+        sl1 << QString::number(0.5 * (double) value / (double) m_iSampleRate);
     }
     qDebug() << "Non-silence begins:" << sl1.join(" ");
 
     QStringList sl2;
     foreach (int value, m_NonSilentEnd) {
-        sl2 << QString::number((double) value / (double) m_iSampleRate);
+        sl2 << QString::number(0.5 * (double) value / (double) m_iSampleRate);
     }
     qDebug() << "Non-silence ends:" << sl2.join(" ");
 
@@ -162,23 +163,69 @@ void AnalyzerSilence::finalize(TrackPointer tio) {
 
     int beginning = m_NonSilentBegin.first();
     int ending = m_NonSilentEnd.last();
+    int beginning_vamp = datavec_init.first();
+    int ending_vamp = datavec_end.last();
 
     //double fBeginning = (double) beginning / (double) m_iTotalSamples;
-    tio->setCuePoint(beginning);
-
     //double fEnding = (double) ending / (double) m_iTotalSamples;
+    //tio->setCuePoint(beginning);
+
+    bool bBeginPointFoundAndSet = false;
     bool bEndPointFoundAndSet = false;
+    bool bHotcue1FoundAndSet = false;
+    bool bHotcue2FoundAndSet = false;
     QList<CuePointer> cues = tio->getCuePoints();
     foreach (CuePointer pCue, cues) {
-        if (pCue->getType() == Cue::END) {
+        if (pCue->getType() == Cue::BEGIN) {
+            pCue->setPosition(beginning);
+            bBeginPointFoundAndSet = true;
+        } else if (pCue->getType() == Cue::END) {
             pCue->setPosition(ending);
             bEndPointFoundAndSet = true;
+        } else if (pCue->getType() == Cue::CUE) {
+            if (pCue->getHotCue() == 1) {
+                pCue->setPosition(beginning_vamp);
+                bHotcue1FoundAndSet = true;
+            } else if (pCue->getHotCue() == 2) {
+                pCue->setPosition(ending_vamp);
+                bHotcue2FoundAndSet = true;
+            }
         }
     }
+
+    if (!bBeginPointFoundAndSet) {
+        CuePointer pCue = tio->addCue();
+        pCue->setType(Cue::BEGIN);
+        pCue->setHotCue(0);
+        pCue->setLabel("BEGIN");
+        pCue->setLength(0);
+        pCue->setPosition(2 * beginning);
+    }
+
     if (!bEndPointFoundAndSet) {
         CuePointer pCue = tio->addCue();
         pCue->setType(Cue::END);
-        pCue->setPosition(ending);
-        pCue->setLabel("End");
+        pCue->setHotCue(0);
+        pCue->setLabel("END");
+        pCue->setLength(0);
+        pCue->setPosition(2 * ending);
+    }
+
+    if (!bHotcue1FoundAndSet) {
+        CuePointer pCue = tio->addCue();
+        pCue->setType(Cue::CUE);
+        pCue->setHotCue(0);
+        //pCue->setLabel("END");
+        pCue->setLength(0);
+        pCue->setPosition(2 * beginning_vamp);
+    }
+
+    if (!bHotcue2FoundAndSet) {
+        CuePointer pCue = tio->addCue();
+        pCue->setType(Cue::CUE);
+        pCue->setHotCue(1);
+        //pCue->setLabel("END");
+        pCue->setLength(0);
+        pCue->setPosition(2 * ending_vamp);
     }
 }

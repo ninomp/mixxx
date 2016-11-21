@@ -156,6 +156,11 @@ class CueControl : public EngineControl {
     ControlProxy* m_pVinylControlEnabled;
     ControlProxy* m_pVinylControlMode;
 
+    ControlObject* m_pADJCueOutPoint;
+
+    ControlObject* m_pSignalBeginPosition;
+    ControlObject* m_pSignalEndPosition;
+
     TrackPointer m_pLoadedTrack;
 
     // Tells us which controls map to which hotcue

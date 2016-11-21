@@ -698,23 +698,28 @@ int Track::getAnalyzerProgress() const {
 }
 
 void Track::setCuePoint(float cue) {
+    qDebug() << "Track::setCuePoint(" << cue << ")";
     QMutexLocker lock(&m_qMutex);
     if (compareAndSet(&m_fCuePoint, cue)) {
         markDirtyAndUnlock(&lock);
+        emit(cuesUpdated());
     }
 }
 
 float Track::getCuePoint() const {
+    qDebug() << "Track::getCuePoint()" << m_fCuePoint;
     QMutexLocker lock(&m_qMutex);
     return m_fCuePoint;
 }
 
 void Track::slotCueUpdated() {
+    qDebug() << "Track::slotCueUpdated()";
     markDirty();
     emit(cuesUpdated());
 }
 
 CuePointer Track::addCue() {
+    qDebug() << "Track::addCue()";
     QMutexLocker lock(&m_qMutex);
     CuePointer pCue(new Cue(m_id));
     connect(pCue.get(), SIGNAL(updated()),

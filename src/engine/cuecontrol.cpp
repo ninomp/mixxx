@@ -101,6 +101,10 @@ CueControl::CueControl(QString group,
 
     m_pVinylControlEnabled = new ControlProxy(group, "vinylcontrol_enabled");
     m_pVinylControlMode = new ControlProxy(group, "vinylcontrol_mode");
+
+    m_pADJCueOutPoint = new ControlObject(ConfigKey(group, "adj_cue_out"));
+    m_pSignalBeginPosition = new ControlObject(ConfigKey(group, "signal_begin_position"));
+    m_pSignalEndPosition = new ControlObject(ConfigKey(group, "signal_end_position"));
 }
 
 CueControl::~CueControl() {
@@ -119,6 +123,9 @@ CueControl::~CueControl() {
     delete m_pPlayIndicator;
     delete m_pVinylControlEnabled;
     delete m_pVinylControlMode;
+    delete m_pADJCueOutPoint;
+    delete m_pSignalBeginPosition;
+    delete m_pSignalEndPosition;
     qDeleteAll(m_hotcueControl);
 }
 
@@ -225,6 +232,8 @@ void CueControl::trackLoaded(TrackPointer pNewTrack, TrackPointer pOldTrack) {
 
         m_pCueIndicator->setBlinkValue(ControlIndicator::OFF);
         m_pCuePoint->set(-1.0);
+        m_pSignalBeginPosition->set(-1.0);
+        m_pSignalEndPosition->set(-1.0);
         m_pLoadedTrack.reset();
     }
 
@@ -245,6 +254,10 @@ void CueControl::trackLoaded(TrackPointer pNewTrack, TrackPointer pOldTrack) {
         CuePointer pCue(it.next());
         if (pCue->getType() == Cue::LOAD) {
             loadCue = pCue;
+        } else if (pCue->getType() == Cue::BEGIN) {
+            m_pSignalBeginPosition->set(pCue->getPosition());
+        } else if (pCue->getType() == Cue::END) {
+            m_pSignalEndPosition->set(pCue->getPosition());
         } else if (pCue->getType() != Cue::CUE) {
             continue;
         }
@@ -289,6 +302,8 @@ void CueControl::cueUpdated() {
 }
 
 void CueControl::trackCuesUpdated() {
+    qDebug() << "CueControl::trackCuesUpdated()";
+
     QMutexLocker lock(&m_mutex);
     QSet<int> active_hotcues;
 
@@ -299,6 +314,15 @@ void CueControl::trackCuesUpdated() {
     QListIterator<CuePointer> it(cuePoints);
     while (it.hasNext()) {
         CuePointer pCue(it.next());
+
+        qDebug() << "Cue type" << pCue->getType()
+                 << "Cue position" << pCue->getPosition();
+
+        if (pCue->getType() == Cue::BEGIN) {
+            m_pSignalBeginPosition->set(pCue->getPosition());
+        } else if (pCue->getType() == Cue::END) {
+            m_pSignalEndPosition->set(pCue->getPosition());
+        }
 
         if (pCue->getType() != Cue::CUE && pCue->getType() != Cue::LOAD)
             continue;

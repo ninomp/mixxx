@@ -23,9 +23,9 @@ class Cue : public QObject {
         BEAT,
         LOOP,
         JUMP,
-        OUT,
         BEGIN,
         END,
+        OUT,
     };
 
     virtual ~Cue();

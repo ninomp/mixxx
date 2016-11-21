@@ -102,6 +102,10 @@ void WaveformRenderMark::slotCuesUpdated() {
 
     QList<CuePointer> loadedCues = trackInfo->getCuePoints();
     for (const CuePointer pCue: loadedCues) {
+        qDebug() << "WaveformRenderMark::slotCuesUpdated()"
+                 << "type" << pCue->getType()
+                 << "position" << pCue->getPosition();
+
         int hotCue = pCue->getHotCue();
         if (hotCue == -1) {
             continue;
