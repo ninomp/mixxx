@@ -65,6 +65,8 @@ DlgPrefWaveform::DlgPrefWaveform(QWidget* pParent, MixxxMainWindow* pMixxx,
             this, SLOT(slotSetVisualGainHigh(double)));
     connect(normalizeOverviewCheckBox, SIGNAL(toggled(bool)),
             this, SLOT(slotSetNormalizeOverview(bool)));
+    connect(wrapMouseCursorCheckBox, SIGNAL(clicked(bool)),
+            this, SLOT(slotSetWrapMouseCursor(bool)));
     connect(factory, SIGNAL(waveformMeasured(float,int)),
             this, SLOT(slotWaveformMeasured(float,int)));
     connect(waveformOverviewComboBox, SIGNAL(currentIndexChanged(int)),
@@ -102,6 +104,10 @@ void DlgPrefWaveform::slotUpdate() {
     highVisualGain->setValue(factory->getVisualGain(WaveformWidgetFactory::High));
     normalizeOverviewCheckBox->setChecked(factory->isOverviewNormalized());
     defaultZoomComboBox->setCurrentIndex(factory->getDefaultZoom() - 1);
+
+    // By default, mouse cursor wrapping is disabled
+    wrapMouseCursorCheckBox->setChecked(
+                m_pConfig->getValue<bool>(ConfigKey("[Waveform]", "WrapMouseCursor"), false));
 
     // By default we set filtered woverview = "0"
     int overviewType = m_pConfig->getValueString(
@@ -151,6 +157,9 @@ void DlgPrefWaveform::slotResetToDefaults() {
 
     // Don't normalize overview.
     normalizeOverviewCheckBox->setChecked(false);
+
+    // Don't wrap mouse cursor by default.
+    wrapMouseCursorCheckBox->setChecked(false);
 
     // 30FPS is the default
     frameRateSlider->setValue(30);
@@ -208,6 +217,10 @@ void DlgPrefWaveform::slotSetVisualGainHigh(double gain) {
 
 void DlgPrefWaveform::slotSetNormalizeOverview(bool normalize) {
     WaveformWidgetFactory::instance()->setOverviewNormalized(normalize);
+}
+
+void DlgPrefWaveform::slotSetWrapMouseCursor(bool enabled) {
+    m_pConfig->set(ConfigKey("[Waveform]", "WrapMouseCursor"), ConfigValue(enabled));
 }
 
 void DlgPrefWaveform::slotWaveformMeasured(float frameRate, int droppedFrames) {

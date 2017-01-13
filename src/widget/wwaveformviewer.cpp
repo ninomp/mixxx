@@ -130,7 +130,8 @@ void WWaveformViewer::mouseMoveEvent(QMouseEvent* event) {
             cursorDelta.setY(-height());
         }
     }
-    if (!cursorDelta.isNull()) {
+    if (!cursorDelta.isNull() && m_pConfig->getValue<bool>(
+                ConfigKey("[Waveform]", "WrapMouseCursor"))) {
         m_mouseAnchor += cursorDelta;
         QCursor::setPos(event->globalPos() + cursorDelta);
     }
