@@ -74,6 +74,7 @@ private:
 
     InteractionMode m_interactionMode;
     QPoint m_mouseAnchor;
+    //bool m_bCursorWrapping;
 
     WaveformWidgetAbstract* m_waveformWidget;
 

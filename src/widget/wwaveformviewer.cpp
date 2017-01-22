@@ -6,6 +6,8 @@
 #include <QUrl>
 #include <QPainter>
 #include <QMimeData>
+#include <QScreen>
+#include <QDesktopWidget>
 
 #include "control/controlobject.h"
 #include "control/controlproxy.h"
@@ -115,19 +117,26 @@ void WWaveformViewer::mouseMoveEvent(QMouseEvent* event) {
         m_pWheel->setParameter(v);
     }
 
+    QDesktopWidget* desktop = QApplication::desktop();
+    QRect desktopGeom = desktop->availableGeometry();
+    /*QScreen screen;
+    QSize screenSize = screen.availableSize();*/
+    int screenWidth = desktop->width();
+    int screenHeight = desktop->height();
+
     // Wrap cursor if outside of this window's bounds
     QPoint cursorDelta(0, 0);
     if (orientation == Qt::Horizontal) {
-        if (event->x() < 0) {
-            cursorDelta.setX(width());
-        } else if (event->x() > width()) {
-            cursorDelta.setX(-width());
+        if (event->globalPos().x() < desktopGeom.left()) {
+            cursorDelta.setX(screenWidth);
+        } else if (event->globalPos().x() > desktopGeom.right()) {
+            cursorDelta.setX(-screenWidth);
         }
     } else if (orientation == Qt::Vertical) {
-        if (event->y() < 0) {
-            cursorDelta.setY(height());
-        } else if (event->y() > height()) {
-            cursorDelta.setY(-height());
+        if (event->globalPos().y() < desktopGeom.top()) {
+            cursorDelta.setY(screenHeight);
+        } else if (event->globalPos().y() > desktopGeom.bottom()) {
+            cursorDelta.setY(-screenHeight);
         }
     }
     if (!cursorDelta.isNull()) {
