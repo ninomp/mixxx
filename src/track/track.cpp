@@ -18,6 +18,10 @@ const mixxx::Logger kLogger("Track");
 
 constexpr bool kLogStats = false;
 
+// The initial cue point/position if not load cue has been set
+// or if the load cue is deleted.
+const CuePosition kDefaultCuePoint = CuePosition();
+
 // Count the number of currently existing instances for detecting
 // memory leaks.
 std::atomic<int> s_numberOfInstances;
@@ -78,6 +82,8 @@ Track::Track(
                 << "->"
                 << numberOfInstancesBefore + 1;
     }
+    // No cue points set so far
+    m_record.setCuePoint(kDefaultCuePoint);
 }
 
 Track::~Track() {
@@ -720,33 +726,33 @@ void Track::setWaveformSummary(ConstWaveformPointer pWaveform) {
 
 void Track::setCuePoint(CuePosition cue) {
     QMutexLocker lock(&m_qMutex);
-
-    if (!compareAndSet(&m_record.refCuePoint(), cue)) {
-        // Nothing changed.
-        return;
-    }
-
-    // Store the cue point in a load cue
     CuePointer pLoadCue = findCueByType(Cue::LOAD);
-    Cue::CueSource source = cue.getSource();
-    double position = cue.getPosition();
-    if (position != 0.0 && position != -1.0) {
-        if (!pLoadCue) {
+    if (cue.getPosition() != 0.0 && cue.getPosition() != -1.0) {
+        // Store the cue point in a load cue
+        if (pLoadCue) {
+            // Pass-through: Modifying the cue object will trigger
+            // the actual update and subsequently this track will
+            // receive and handle the corresponding signal.
+            lock.unlock();
+            pLoadCue->setCuePosition(cue);
+        } else {
+            // Create a new LOAD cue point if there is none yet
             pLoadCue = CuePointer(new Cue(m_record.getId()));
             pLoadCue->setType(Cue::LOAD);
-            connect(pLoadCue.get(), SIGNAL(updated()),
-                    this, SLOT(slotCueUpdated()));
+            pLoadCue->setCuePosition(cue);
             m_cuePoints.push_back(pLoadCue);
+            connect(pLoadCue.get(), &Cue::updated, this, &Track::slotCueUpdated);
+            m_record.setCuePoint(cue);
+            markDirtyAndUnlock(&lock);
+            emit cuesUpdated();
         }
-        pLoadCue->setPosition(position);
-        pLoadCue->setSource(source);
     } else {
         disconnect(pLoadCue.get(), 0, this, 0);
         m_cuePoints.removeOne(pLoadCue);
+        m_record.setCuePoint(kDefaultCuePoint);
+        markDirtyAndUnlock(&lock);
+        emit cuesUpdated();
     }
-
-    markDirtyAndUnlock(&lock);
-    emit(cuesUpdated());
 }
 
 CuePosition Track::getCuePoint() const {
@@ -755,8 +761,15 @@ CuePosition Track::getCuePoint() const {
 }
 
 void Track::slotCueUpdated() {
-    markDirty();
-    emit(cuesUpdated());
+    QMutexLocker lock(&m_qMutex);
+    CuePointer pLoadCue = findCueByType(Cue::LOAD);
+    if (pLoadCue) {
+        m_record.setCuePoint(pLoadCue->getCuePosition());
+    } else {
+        m_record.setCuePoint(kDefaultCuePoint);
+    }
+    markDirtyAndUnlock(&lock);
+    emit cuesUpdated();
 }
 
 CuePointer Track::createAndAddCue() {
@@ -799,24 +812,23 @@ void Track::removeCue(const CuePointer& pCue) {
 }
 
 void Track::removeCuesOfType(Cue::CueType type) {
+    bool removed = false;
     QMutexLocker lock(&m_qMutex);
-    bool dirty = false;
     QMutableListIterator<CuePointer> it(m_cuePoints);
     while (it.hasNext()) {
         CuePointer pCue = it.next();
-        // FIXME: Why does this only work for the CUE CueType?
         if (pCue->getType() == type) {
             disconnect(pCue.get(), 0, this, 0);
             it.remove();
-            dirty = true;
+            removed = true;
         }
     }
-    if (compareAndSet(&m_record.refCuePoint(), CuePosition())) {
-        dirty = true;
-    }
-    if (dirty) {
+    if (removed) {
+        if (type == Cue::LOAD) {
+            m_record.setCuePoint(kDefaultCuePoint);
+        }
         markDirtyAndUnlock(&lock);
-        emit(cuesUpdated());
+        emit cuesUpdated();
     }
 }
 
@@ -834,16 +846,23 @@ void Track::setCuePoints(const QList<CuePointer>& cuePoints) {
     }
     m_cuePoints = cuePoints;
     // connect new cue points
+    CuePointer pLoadCue;
     for (const auto& pCue: m_cuePoints) {
         connect(pCue.get(), SIGNAL(updated()),
                 this, SLOT(slotCueUpdated()));
-        // update main cue point
+        // update main cue point (after loop)
         if (pCue->getType() == Cue::LOAD) {
-            m_record.setCuePoint(CuePosition(pCue->getPosition(), pCue->getSource()));
+            DEBUG_ASSERT(!pLoadCue);
+            pLoadCue = pCue;
         }
     }
+    if (pLoadCue) {
+        m_record.setCuePoint(pLoadCue->getCuePosition());
+    } else {
+        m_record.setCuePoint(kDefaultCuePoint);
+    }
     markDirtyAndUnlock(&lock);
-    emit(cuesUpdated());
+    emit cuesUpdated();
 }
 
 void Track::markDirty() {
