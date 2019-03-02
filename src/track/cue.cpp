@@ -115,6 +115,22 @@ void Cue::setPosition(double samplePosition) {
     }
 }
 
+CuePosition Cue::getCuePosition() const {
+    QMutexLocker lock(&m_mutex);
+    return CuePosition(m_samplePosition, m_source);
+}
+
+void Cue::setCuePosition(CuePosition position) {
+    QMutexLocker lock(&m_mutex);
+    if (CuePosition(m_samplePosition, m_source) != position) {
+        m_samplePosition = position.getPosition();
+        m_source = position.getSource();
+        m_bDirty = true;
+        lock.unlock();
+        emit updated();
+    }
+}
+
 double Cue::getLength() const {
     QMutexLocker lock(&m_mutex);
     return m_length;
