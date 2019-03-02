@@ -784,7 +784,7 @@ CuePointer Track::findCueByType(Cue::CueType type) const {
 }
 
 void Track::removeCue(const CuePointer& pCue) {
-    if (pCue == nullptr) {
+    VERIFY_OR_DEBUG_ASSERT(pCue) {
         return;
     }
 

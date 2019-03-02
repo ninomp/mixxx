@@ -775,8 +775,10 @@ void CueControl::hotcueClear(HotcueControl* pControl, double v) {
     }
 
     CuePointer pCue(pControl->getCue());
-    detachCue(pControl->getHotcueNumber());
-    m_pLoadedTrack->removeCue(pCue);
+    if (pCue) {
+        detachCue(pControl->getHotcueNumber());
+        m_pLoadedTrack->removeCue(pCue);
+    }
 }
 
 void CueControl::hotcuePositionChanged(HotcueControl* pControl, double newPosition) {
