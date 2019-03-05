@@ -18,9 +18,7 @@ const mixxx::Logger kLogger("Track");
 
 constexpr bool kLogStats = false;
 
-// The initial cue point/position if not load cue has been set
-// or if the load cue is deleted.
-const CuePosition kDefaultCuePoint = CuePosition();
+const CuePosition kDefaultCuePoint = CuePosition(0.0, Cue::AUTOMATIC);
 
 // Count the number of currently existing instances for detecting
 // memory leaks.
@@ -82,8 +80,6 @@ Track::Track(
                 << "->"
                 << numberOfInstancesBefore + 1;
     }
-    // No cue points set so far
-    m_record.setCuePoint(kDefaultCuePoint);
 }
 
 Track::~Track() {
@@ -209,19 +205,19 @@ QString Track::getCanonicalLocation() const {
     // might not be thread-safe due to internal caching!
     QMutexLocker lock(&m_qMutex);
 
-    // Note: We return here the cached value, that was calculated just after 
-    // init this Track object. This will avoid repeated use of the time 
+    // Note: We return here the cached value, that was calculated just after
+    // init this Track object. This will avoid repeated use of the time
     // consuming file IO.
-    // We ignore the case when the user changes a symbolic link to 
+    // We ignore the case when the user changes a symbolic link to
     // point a file to an other location, since this is a user action.
-    // We also don't care if a file disappears while Mixxx is running. Opening 
+    // We also don't care if a file disappears while Mixxx is running. Opening
     // a non-existent file is already handled and doesn't cause any malfunction.
     QString loc = TrackRef::canonicalLocation(m_fileInfo);
     if (loc.isEmpty()) {
-        // we see here an empty path because the file did not exist  
+        // we see here an empty path because the file did not exist
         // when creating the track object.
         // The user might have restored the track in the meanwhile.
-        // So try again it again. 
+        // So try again it again.
         m_fileInfo.refresh();
         loc = TrackRef::canonicalLocation(m_fileInfo);
     }
@@ -742,14 +738,12 @@ void Track::setCuePoint(CuePosition cue) {
             pLoadCue->setCuePosition(cue);
             m_cuePoints.push_back(pLoadCue);
             connect(pLoadCue.get(), &Cue::updated, this, &Track::slotCueUpdated);
-            m_record.setCuePoint(cue);
             markDirtyAndUnlock(&lock);
             emit cuesUpdated();
         }
     } else {
         disconnect(pLoadCue.get(), 0, this, 0);
         m_cuePoints.removeOne(pLoadCue);
-        m_record.setCuePoint(kDefaultCuePoint);
         markDirtyAndUnlock(&lock);
         emit cuesUpdated();
     }
@@ -757,18 +751,16 @@ void Track::setCuePoint(CuePosition cue) {
 
 CuePosition Track::getCuePoint() const {
     QMutexLocker lock(&m_qMutex);
-    return m_record.getCuePoint();
+    CuePointer pLoadCue = findCueByType(Cue::LOAD);
+    lock.unlock();
+    if (pLoadCue) {
+        return pLoadCue->getCuePosition();
+    } else {
+        return kDefaultCuePoint;
+    }
 }
 
 void Track::slotCueUpdated() {
-    QMutexLocker lock(&m_qMutex);
-    CuePointer pLoadCue = findCueByType(Cue::LOAD);
-    if (pLoadCue) {
-        m_record.setCuePoint(pLoadCue->getCuePosition());
-    } else {
-        m_record.setCuePoint(kDefaultCuePoint);
-    }
-    markDirtyAndUnlock(&lock);
     emit cuesUpdated();
 }
 
@@ -802,13 +794,12 @@ void Track::removeCue(const CuePointer& pCue) {
     }
 
     QMutexLocker lock(&m_qMutex);
-    disconnect(pCue.get(), 0, this, 0);
-    m_cuePoints.removeOne(pCue);
-    if (pCue->getType() == Cue::LOAD) {
-        m_record.setCuePoint(CuePosition());
+    if (m_cuePoints.removeOne(pCue)) {
+        disconnect(pCue.get(), 0, this, 0);
+        m_cuePoints.removeOne(pCue);
+        markDirtyAndUnlock(&lock);
+        emit cuesUpdated();
     }
-    markDirtyAndUnlock(&lock);
-    emit(cuesUpdated());
 }
 
 void Track::removeCuesOfType(Cue::CueType type) {
@@ -824,9 +815,6 @@ void Track::removeCuesOfType(Cue::CueType type) {
         }
     }
     if (removed) {
-        if (type == Cue::LOAD) {
-            m_record.setCuePoint(kDefaultCuePoint);
-        }
         markDirtyAndUnlock(&lock);
         emit cuesUpdated();
     }
@@ -846,20 +834,9 @@ void Track::setCuePoints(const QList<CuePointer>& cuePoints) {
     }
     m_cuePoints = cuePoints;
     // connect new cue points
-    CuePointer pLoadCue;
     for (const auto& pCue: m_cuePoints) {
         connect(pCue.get(), SIGNAL(updated()),
                 this, SLOT(slotCueUpdated()));
-        // update main cue point (after loop)
-        if (pCue->getType() == Cue::LOAD) {
-            DEBUG_ASSERT(!pLoadCue);
-            pLoadCue = pCue;
-        }
-    }
-    if (pLoadCue) {
-        m_record.setCuePoint(pLoadCue->getCuePosition());
-    } else {
-        m_record.setCuePoint(kDefaultCuePoint);
     }
     markDirtyAndUnlock(&lock);
     emit cuesUpdated();

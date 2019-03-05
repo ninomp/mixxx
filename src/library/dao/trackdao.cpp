@@ -1031,7 +1031,12 @@ bool setTrackSampleRate(const QSqlRecord& record, const int column,
 
 bool setTrackCuePoint(const QSqlRecord& record, const int column,
                       TrackPointer pTrack) {
-    pTrack->setCuePoint(CuePosition(record.value(column).toDouble(), Cue::MANUAL));
+    Q_UNUSED(record);
+    Q_UNUSED(column);
+    Q_UNUSED(pTrack);
+    // The track's main cue point is stored in a separate cue object
+    // and no longer within the track itself. The corresponding table
+    // column is write-only to retain backward compatibility.
     return false;
 }
 
