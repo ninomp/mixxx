@@ -1664,6 +1664,12 @@ CueControl::TrackAt CueControl::getTrackAt() const {
 }
 
 double CueControl::quantizeCuePoint(double position, Cue::CueSource source, QuantizeMode mode) {
+    // Clamp position to end of track.
+    SampleOfTrack sot = getSampleOfTrack();
+    if (position >= sot.total) {
+        position = sot.total - 1.0;
+    }
+
     // Don't quantize unset cues, manual cues or when quantization is disabled.
     if (position == -1.0 || source == Cue::MANUAL || !m_pQuantizeEnabled->toBool()) {
         return position;
