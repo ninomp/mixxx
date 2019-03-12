@@ -79,10 +79,12 @@ Cue::CueSource Cue::getSource() const {
 
 void Cue::setSource(CueSource source) {
     QMutexLocker lock(&m_mutex);
-    m_source = source;
-    m_bDirty = true;
-    lock.unlock();
-    emit(updated());
+    if (m_source != source) {
+        m_source = source;
+        m_bDirty = true;
+        lock.unlock();
+        emit updated();
+    }
 }
 
 Cue::CueType Cue::getType() const {
@@ -105,10 +107,28 @@ double Cue::getPosition() const {
 
 void Cue::setPosition(double samplePosition) {
     QMutexLocker lock(&m_mutex);
-    m_samplePosition = samplePosition;
-    m_bDirty = true;
-    lock.unlock();
-    emit(updated());
+    if (m_samplePosition != samplePosition) {
+        m_samplePosition = samplePosition;
+        m_bDirty = true;
+        lock.unlock();
+        emit updated();
+    }
+}
+
+CuePosition Cue::getCuePosition() const {
+    QMutexLocker lock(&m_mutex);
+    return CuePosition(m_samplePosition, m_source);
+}
+
+void Cue::setCuePosition(CuePosition position) {
+    QMutexLocker lock(&m_mutex);
+    if (CuePosition(m_samplePosition, m_source) != position) {
+        m_samplePosition = position.getPosition();
+        m_source = position.getSource();
+        m_bDirty = true;
+        lock.unlock();
+        emit updated();
+    }
 }
 
 double Cue::getLength() const {
