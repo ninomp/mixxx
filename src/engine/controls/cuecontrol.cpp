@@ -451,9 +451,6 @@ void CueControl::loadCuesFromTrack() {
 
         m_pCuePoint->set(quantizeCuePoint(position, source, QuantizeMode::ClosestBeat));
         m_pCueSource->set(source);
-    } else {
-        m_pCuePoint->set(-1.0);
-        m_pCueSource->set(Cue::UNKNOWN);
     }
 
     if (pIntroCue) {
@@ -469,18 +466,7 @@ void CueControl::loadCuesFromTrack() {
             m_pIntroEndPosition->set(quantizeCuePoint(position + length, source, QuantizeMode::NextBeat));
             m_pIntroEndSource->set(source);
             m_pIntroEndEnabled->forceSet(1.0);
-        } else {
-            m_pIntroEndPosition->set(-1.0);
-            m_pIntroEndSource->set(Cue::UNKNOWN);
-            m_pIntroEndEnabled->forceSet(0.0);
         }
-    } else {
-        m_pIntroStartPosition->set(-1.0);
-        m_pIntroStartSource->set(Cue::UNKNOWN);
-        m_pIntroStartEnabled->forceSet(0.0);
-        m_pIntroEndPosition->set(-1.0);
-        m_pIntroEndSource->set(Cue::UNKNOWN);
-        m_pIntroEndEnabled->forceSet(0.0);
     }
 
     if (pOutroCue) {
@@ -496,18 +482,7 @@ void CueControl::loadCuesFromTrack() {
             m_pOutroEndPosition->set(quantizeCuePoint(position + length, source, QuantizeMode::NextBeat));
             m_pOutroEndSource->set(source);
             m_pOutroEndEnabled->forceSet(1.0);
-        } else {
-            m_pOutroEndPosition->set(-1.0);
-            m_pOutroEndSource->set(Cue::UNKNOWN);
-            m_pOutroEndEnabled->forceSet(0.0);
         }
-    } else {
-        m_pOutroStartPosition->set(-1.0);
-        m_pOutroStartSource->set(Cue::UNKNOWN);
-        m_pOutroStartEnabled->forceSet(0.0);
-        m_pOutroEndPosition->set(-1.0);
-        m_pOutroEndSource->set(Cue::UNKNOWN);
-        m_pOutroEndEnabled->forceSet(0.0);
     }
 
     // Detach all hotcues that are no longer present
@@ -526,6 +501,22 @@ void CueControl::reloadCuesFromTrack() {
     TrackAt trackAt = getTrackAt();
     bool wasTrackAtZeroPos = isTrackAtZeroPos();
     bool wasTrackAtIntroCue = isTrackAtIntroCue();
+
+    // Reset COs.
+    m_pCuePoint->set(-1.0);
+    m_pCueSource->set(Cue::UNKNOWN);
+    m_pIntroStartPosition->set(-1.0);
+    m_pIntroStartSource->set(Cue::UNKNOWN);
+    m_pIntroStartEnabled->forceSet(0.0);
+    m_pIntroEndPosition->set(-1.0);
+    m_pIntroEndSource->set(Cue::UNKNOWN);
+    m_pIntroEndEnabled->forceSet(0.0);
+    m_pOutroStartPosition->set(-1.0);
+    m_pOutroStartSource->set(Cue::UNKNOWN);
+    m_pOutroStartEnabled->forceSet(0.0);
+    m_pOutroEndPosition->set(-1.0);
+    m_pOutroEndSource->set(Cue::UNKNOWN);
+    m_pOutroEndEnabled->forceSet(0.0);
 
     // Update COs with cues from track.
     loadCuesFromTrack();
