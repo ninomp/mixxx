@@ -224,12 +224,14 @@ TrackPointer BaseTrackPlayerImpl::unloadTrack() {
                 pLoopCue = pCue;
             }
         }
-        if (!pLoopCue) {
-            pLoopCue = m_pLoadedTrack->createAndAddCue();
-            pLoopCue->setSource(Cue::MANUAL);
-            pLoopCue->setType(Cue::LOOP);
+        CuePosition cuePos(loopStart, Cue::MANUAL);
+        if (pLoopCue) {
+            pLoopCue->setCuePosition(cuePos);
+        } else {
+            pLoopCue = m_pLoadedTrack->createAndAddCue(
+                Cue::LOOP,
+                cuePos);
         }
-        pLoopCue->setPosition(loopStart);
         pLoopCue->setLength(loopEnd - loopStart);
     }
 

@@ -543,16 +543,14 @@ void CueControl::hotcueSet(HotcueControl* pControl, double v) {
     // https://bugs.launchpad.net/mixxx/+bug/1653276
     hotcueClear(pControl, v);
 
-    CuePointer pCue(m_pLoadedTrack->createAndAddCue());
     double closestBeat = m_pClosestBeat->get();
-    double cuePosition =
+    double position =
             (m_pQuantizeEnabled->toBool() && closestBeat != -1) ?
                     closestBeat : getSampleOfTrack().current;
-    pCue->setPosition(cuePosition);
+    CuePosition cuePos(position, Cue::MANUAL);
+    CuePointer pCue = m_pLoadedTrack->createAndAddCue(Cue::CUE, cuePos);
     pCue->setHotCue(hotcue);
     pCue->setLabel("");
-    pCue->setType(Cue::CUE);
-    pCue->setSource(Cue::MANUAL);
     // TODO(XXX) deal with spurious signals
     attachCue(pCue, hotcue);
 
@@ -563,7 +561,7 @@ void CueControl::hotcueSet(HotcueControl* pControl, double v) {
     if (!playing && m_pQuantizeEnabled->toBool()) {
         lock.unlock();  // prevent deadlock.
         // Enginebuffer will quantize more exactly than we can.
-        seekAbs(cuePosition);
+        seekAbs(position);
     }
 }
 
@@ -1111,13 +1109,13 @@ void CueControl::introStartSet(double v) {
     lock.unlock();
 
     if (pLoadedTrack) {
+        CuePosition cuePos(position, Cue::MANUAL);
         CuePointer pCue = pLoadedTrack->findCueByType(Cue::INTRO);
-        if (!pCue) {
-            pCue = pLoadedTrack->createAndAddCue();
-            pCue->setType(Cue::INTRO);
+        if (pCue) {
+            pCue->setCuePosition(cuePos);
+        } else {
+            pCue = pLoadedTrack->createAndAddCue(Cue::INTRO, cuePos);
         }
-        pCue->setSource(Cue::MANUAL);
-        pCue->setPosition(position);
         pCue->setLength(introEnd != -1.0 ? introEnd - position : 0.0);
     }
 }
@@ -1190,19 +1188,23 @@ void CueControl::introEndSet(double v) {
     lock.unlock();
 
     if (pLoadedTrack) {
-        CuePointer pCue = pLoadedTrack->findCueByType(Cue::INTRO);
-        if (!pCue) {
-            pCue = pLoadedTrack->createAndAddCue();
-            pCue->setType(Cue::INTRO);
-        }
-        pCue->setSource(Cue::MANUAL);
+        double position;
+        double length;
         if (introStart != -1.0) {
-            pCue->setPosition(introStart);
-            pCue->setLength(position - introStart);
+            position = introStart;
+            length = position - introStart;
         } else {
-            pCue->setPosition(-1.0);
-            pCue->setLength(position);
+            position = -1.0;
+            length = position;
         }
+        CuePosition cuePos(position, Cue::MANUAL);
+        CuePointer pCue = pLoadedTrack->findCueByType(Cue::INTRO);
+        if (pCue) {
+            pCue->setSource(Cue::MANUAL);
+        } else {
+            pCue = pLoadedTrack->createAndAddCue(Cue::INTRO, cuePos);
+        }
+        pCue->setLength(length);
     }
 }
 
@@ -1274,13 +1276,13 @@ void CueControl::outroStartSet(double v) {
     lock.unlock();
 
     if (pLoadedTrack) {
+        CuePosition cuePos(position, Cue::MANUAL);
         CuePointer pCue = pLoadedTrack->findCueByType(Cue::OUTRO);
-        if (!pCue) {
-            pCue = pLoadedTrack->createAndAddCue();
-            pCue->setType(Cue::OUTRO);
+        if (pCue) {
+            pCue->setCuePosition(cuePos);
+        } else {
+            pCue = pLoadedTrack->createAndAddCue(Cue::OUTRO, cuePos);
         }
-        pCue->setSource(Cue::MANUAL);
-        pCue->setPosition(position);
         pCue->setLength(outroEnd != -1.0 ? outroEnd - position : 0.0);
     }
 }
@@ -1353,19 +1355,23 @@ void CueControl::outroEndSet(double v) {
     lock.unlock();
 
     if (pLoadedTrack) {
-        CuePointer pCue = pLoadedTrack->findCueByType(Cue::OUTRO);
-        if (!pCue) {
-            pCue = pLoadedTrack->createAndAddCue();
-            pCue->setType(Cue::OUTRO);
-        }
-        pCue->setSource(Cue::MANUAL);
+        double position;
+        double length;
         if (outroStart != -1.0) {
-            pCue->setPosition(outroStart);
-            pCue->setLength(position - outroStart);
+            position = outroStart;
+            length = position - outroStart;
         } else {
-            pCue->setPosition(-1.0);
-            pCue->setLength(position);
+            position = -1.0;
+            length = position;
         }
+        CuePosition cuePos(position, Cue::MANUAL);
+        CuePointer pCue = pLoadedTrack->findCueByType(Cue::OUTRO);
+        if (pCue) {
+            pCue->setSource(Cue::MANUAL);
+        } else {
+            pCue = pLoadedTrack->createAndAddCue(Cue::OUTRO, cuePos);
+        }
+        pCue->setLength(length);
     }
 }
 

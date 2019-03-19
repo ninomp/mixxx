@@ -174,16 +174,16 @@ TEST_F(AnalyzerSilenceTest, UpdateNonUserAdjustedCues) {
 
     pTrack->setCuePoint(CuePosition(100, Cue::AUTOMATIC));  // Arbitrary value
 
-    CuePointer pIntroCue = pTrack->createAndAddCue();
-    pIntroCue->setType(Cue::INTRO);
-    pIntroCue->setSource(Cue::AUTOMATIC);
-    pIntroCue->setPosition(1000);  // Arbitrary value
+    CuePointer pIntroCue = pTrack->createAndAddCue(
+        Cue::INTRO,
+        CuePosition(1000, Cue::AUTOMATIC) // Arbitrary value
+    );
     pIntroCue->setLength(0.0);
 
-    CuePointer pOutroCue = pTrack->createAndAddCue();
-    pOutroCue->setType(Cue::OUTRO);
-    pOutroCue->setSource(Cue::AUTOMATIC);
-    pOutroCue->setPosition(-1.0);
+    CuePointer pOutroCue = pTrack->createAndAddCue(
+        Cue::OUTRO,
+        CuePosition(-1.0, Cue::AUTOMATIC)
+    );
     pOutroCue->setLength(9000);  // Arbitrary value
 
     // Fill the first half with silence
@@ -220,16 +220,16 @@ TEST_F(AnalyzerSilenceTest, RespectUserEdits) {
 
     pTrack->setCuePoint(CuePosition(kManualCuePosition, Cue::MANUAL));
 
-    CuePointer pIntroCue = pTrack->createAndAddCue();
-    pIntroCue->setType(Cue::INTRO);
-    pIntroCue->setSource(Cue::MANUAL);
-    pIntroCue->setPosition(kManualIntroPosition);
+    CuePointer pIntroCue = pTrack->createAndAddCue(
+        Cue::INTRO,
+        CuePosition(kManualIntroPosition, Cue::MANUAL)
+    );
     pIntroCue->setLength(0.0);
 
-    CuePointer pOutroCue = pTrack->createAndAddCue();
-    pOutroCue->setType(Cue::OUTRO);
-    pOutroCue->setSource(Cue::MANUAL);
-    pOutroCue->setPosition(-1.0);
+    CuePointer pOutroCue = pTrack->createAndAddCue(
+        Cue::OUTRO,
+        CuePosition(-1.0, Cue::MANUAL)
+    );
     pOutroCue->setLength(kManualOutroPosition);
 
     // Fill the first half with silence

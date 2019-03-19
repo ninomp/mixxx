@@ -245,16 +245,17 @@ class Track : public QObject {
 
     // Get the track's main cue point
     CuePosition getCuePoint() const;
+    CuePointer getOrAddLoadCue(CuePosition defaultPos = kDefaultLoadCuePosition);
     // Set the track's main cue point
-    void setCuePoint(CuePosition cue);
+    void setCuePoint(CuePosition pos);
 
     // Calls for managing the track's cue points
-    CuePointer createAndAddCue();
+    CuePointer createAndAddCue(Cue::CueType type, CuePosition pos);
     CuePointer findCueByType(Cue::CueType type) const;  // NOTE: Cannot be used for hotcues.
     void removeCue(const CuePointer& pCue);
     void removeCuesOfType(Cue::CueType);
     QList<CuePointer> getCuePoints() const;
-    void setCuePoints(const QList<CuePointer>& cuePoints);
+    void setCuePoints(QList<CuePointer> cuePoints);
 
     bool isDirty();
 
@@ -322,6 +323,8 @@ class Track : public QObject {
     void slotBeatsUpdated();
 
   private:
+    static const CuePosition kDefaultLoadCuePosition;
+
     // Set a unique identifier for the track. Only used by
     // GlobalTrackCacheResolver!
     void initId(TrackId id); // write-once
@@ -339,6 +342,8 @@ class Track : public QObject {
     void setBeatsAndUnlock(QMutexLocker* pLock, BeatsPointer pBeats);
 
     void afterKeysUpdated(QMutexLocker* pLock);
+
+    CuePointer refreshLoadCue(CuePosition defaultPos = kDefaultLoadCuePosition);
 
     enum class DurationRounding {
         SECONDS, // rounded to full seconds
