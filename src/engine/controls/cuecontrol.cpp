@@ -1200,7 +1200,7 @@ void CueControl::introEndSet(double v) {
         CuePosition cuePos(position, Cue::MANUAL);
         CuePointer pCue = pLoadedTrack->findCueByType(Cue::INTRO);
         if (pCue) {
-            pCue->setSource(Cue::MANUAL);
+            pCue->setCuePosition(cuePos);
         } else {
             pCue = pLoadedTrack->createAndAddCue(Cue::INTRO, cuePos);
         }
@@ -1367,7 +1367,7 @@ void CueControl::outroEndSet(double v) {
         CuePosition cuePos(position, Cue::MANUAL);
         CuePointer pCue = pLoadedTrack->findCueByType(Cue::OUTRO);
         if (pCue) {
-            pCue->setSource(Cue::MANUAL);
+            pCue->setCuePosition(cuePos);
         } else {
             pCue = pLoadedTrack->createAndAddCue(Cue::OUTRO, cuePos);
         }
