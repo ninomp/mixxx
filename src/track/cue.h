@@ -64,6 +64,8 @@ class Cue : public QObject {
     CuePosition getCuePosition() const;
     void setCuePosition(CuePosition position);
 
+    void setCuePositionAndLength(CuePosition position, double length);
+
   signals:
     void updated();
 

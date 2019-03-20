@@ -94,12 +94,14 @@ void AnalyzerSilence::finalize(TrackPointer tio) {
 
     CuePosition introPos(mixxx::kAnalysisChannels * m_iSignalStart, Cue::AUTOMATIC);
     CuePointer pIntroCue = tio->findCueByType(Cue::INTRO);
-    if (!pIntroCue) {
+    if (pIntroCue) {
+        if (pIntroCue->getSource() != Cue::MANUAL) {
+            pIntroCue->setCuePosition(introPos);
+        }
+    } else {
         pIntroCue = tio->createAndAddCue(
             Cue::INTRO,
             introPos);
-    } else if (pIntroCue->getSource() != Cue::MANUAL) {
-        pIntroCue->setCuePosition(introPos);
     }
     // Adjust the load cue
     CuePointer pLoadCue = tio->getOrAddLoadCue(introPos);
@@ -110,12 +112,14 @@ void AnalyzerSilence::finalize(TrackPointer tio) {
 
     double outroLen = mixxx::kAnalysisChannels * m_iSignalEnd;
     CuePointer pOutroCue = tio->findCueByType(Cue::OUTRO);
-    if (!pOutroCue) {
+    if (pOutroCue) {
+        if (pOutroCue->getSource() != Cue::MANUAL) {
+            pOutroCue->setLength(outroLen);
+        }
+    } else {
         pOutroCue = tio->createAndAddCue(
             Cue::OUTRO,
-            CuePosition(-1.0, Cue::AUTOMATIC));
-    }
-    if (pOutroCue->getSource() != Cue::MANUAL) {
-        pOutroCue->setLength(outroLen);
+            CuePosition(-1.0, Cue::AUTOMATIC),
+            outroLen);
     }
 }

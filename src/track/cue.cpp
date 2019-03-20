@@ -131,6 +131,18 @@ void Cue::setCuePosition(CuePosition position) {
     }
 }
 
+void Cue::setCuePositionAndLength(CuePosition position, double length) {
+    QMutexLocker lock(&m_mutex);
+    if (CuePosition(m_samplePosition, m_source) != position || m_length != length) {
+        m_samplePosition = position.getPosition();
+        m_source = position.getSource();
+        m_length = length;
+        m_bDirty = true;
+        lock.unlock();
+        emit updated();
+    }
+}
+
 double Cue::getLength() const {
     QMutexLocker lock(&m_mutex);
     return m_length;

@@ -1085,22 +1085,22 @@ void CueControl::introStartSet(double v) {
 
     // Quantize cue point to nearest beat before current position.
     // Fall back to nearest beat after or current position.
-    double position = quantizeCurrentPosition(QuantizeMode::PreviousBeat);
+    double introStart = quantizeCurrentPosition(QuantizeMode::PreviousBeat);
 
     // Make sure user is not trying to place intro start cue on or after
     // other intro/outro cues.
     double introEnd = m_pIntroEndPosition->get();
     double outroStart = m_pOutroStartPosition->get();
     double outroEnd = m_pOutroEndPosition->get();
-    if (introEnd != -1.0 && position >= introEnd) {
+    if (introEnd != -1.0 && introStart >= introEnd) {
         qWarning() << "Trying to place intro start cue on or after intro end cue.";
         return;
     }
-    if (outroStart != -1.0 && position >= outroStart) {
+    if (outroStart != -1.0 && introStart >= outroStart) {
         qWarning() << "Trying to place intro start cue on or after outro start cue.";
         return;
     }
-    if (outroEnd != -1.0 && position >= outroEnd) {
+    if (outroEnd != -1.0 && introStart >= outroEnd) {
         qWarning() << "Trying to place intro start cue on or after outro end cue.";
         return;
     }
@@ -1109,14 +1109,14 @@ void CueControl::introStartSet(double v) {
     lock.unlock();
 
     if (pLoadedTrack) {
-        CuePosition cuePos(position, Cue::MANUAL);
+        double length = introEnd != -1.0 ? introEnd - introStart : 0.0;
+        CuePosition position(introStart, Cue::MANUAL);
         CuePointer pCue = pLoadedTrack->findCueByType(Cue::INTRO);
         if (pCue) {
-            pCue->setCuePosition(cuePos);
+            pCue->setCuePositionAndLength(position, length);
         } else {
-            pCue = pLoadedTrack->createAndAddCue(Cue::INTRO, cuePos);
+            pCue = pLoadedTrack->createAndAddCue(Cue::INTRO, position, length);
         }
-        pCue->setLength(introEnd != -1.0 ? introEnd - position : 0.0);
     }
 }
 
@@ -1132,11 +1132,12 @@ void CueControl::introStartClear(double v) {
 
     if (pLoadedTrack) {
         CuePointer pCue = pLoadedTrack->findCueByType(Cue::INTRO);
-        if (introEnd != -1.0) {
-            pCue->setPosition(-1.0);
-            pCue->setLength(introEnd);
-        } else if (pCue) {
-            pLoadedTrack->removeCue(pCue);
+        if (pCue) {
+            if (introEnd != -1.0) {
+                pCue->setCuePositionAndLength(CuePosition(-1.0, Cue::MANUAL), introEnd);
+            } else if (pCue) {
+                pLoadedTrack->removeCue(pCue);
+            }
         }
     }
 }
@@ -1164,22 +1165,22 @@ void CueControl::introEndSet(double v) {
 
     // Quantize cue point to nearest beat after current position.
     // Fall back to nearest beat before or current position.
-    double position = quantizeCurrentPosition(QuantizeMode::NextBeat);
+    double introEnd = quantizeCurrentPosition(QuantizeMode::NextBeat);
 
     // Make sure user is not trying to place intro end cue on or before
     // intro start cue, or on or after outro start/end cue.
     double introStart = m_pIntroStartPosition->get();
     double outroStart = m_pOutroStartPosition->get();
     double outroEnd = m_pOutroEndPosition->get();
-    if (introStart != -1.0 && position <= introStart) {
+    if (introStart != -1.0 && introEnd <= introStart) {
         qWarning() << "Trying to place intro end cue on or before intro start cue.";
         return;
     }
-    if (outroStart != -1.0 && position >= outroStart) {
+    if (outroStart != -1.0 && introEnd >= outroStart) {
         qWarning() << "Trying to place intro end cue on or after outro start cue.";
         return;
     }
-    if (outroEnd != -1.0 && position >= outroEnd) {
+    if (outroEnd != -1.0 && introEnd >= outroEnd) {
         qWarning() << "Trying to place intro end cue on or after outro end cue.";
         return;
     }
@@ -1188,23 +1189,23 @@ void CueControl::introEndSet(double v) {
     lock.unlock();
 
     if (pLoadedTrack) {
-        double position;
         double length;
         if (introStart != -1.0) {
-            position = introStart;
-            length = position - introStart;
+            // Both start and end position are available
+            length = introEnd - introStart;
+            introEnd = introStart;
         } else {
-            position = -1.0;
-            length = position;
+            // Only end position is available, start position is missing
+            length = introEnd;
+            introEnd = -1.0;
         }
-        CuePosition cuePos(position, Cue::MANUAL);
+        CuePosition position(introEnd, Cue::MANUAL);
         CuePointer pCue = pLoadedTrack->findCueByType(Cue::INTRO);
         if (pCue) {
-            pCue->setCuePosition(cuePos);
+            pCue->setCuePositionAndLength(position, length);
         } else {
-            pCue = pLoadedTrack->createAndAddCue(Cue::INTRO, cuePos);
+            pLoadedTrack->createAndAddCue(Cue::INTRO, position, length);
         }
-        pCue->setLength(length);
     }
 }
 
@@ -1220,11 +1221,12 @@ void CueControl::introEndClear(double v) {
 
     if (pLoadedTrack) {
         CuePointer pCue = pLoadedTrack->findCueByType(Cue::INTRO);
-        if (introStart != -1.0) {
-            pCue->setPosition(introStart);
-            pCue->setLength(0.0);
-        } else if (pCue) {
-            pLoadedTrack->removeCue(pCue);
+        if (pCue) {
+            if (introStart != -1.0) {
+                pCue->setCuePositionAndLength(CuePosition(introStart, Cue::MANUAL), 0.0);
+            } else if (pCue) {
+                pLoadedTrack->removeCue(pCue);
+            }
         }
     }
 }
@@ -1252,22 +1254,22 @@ void CueControl::outroStartSet(double v) {
 
     // Quantize cue point to nearest beat before current position.
     // Fall back to nearest beat after or current position.
-    double position = quantizeCurrentPosition(QuantizeMode::PreviousBeat);
+    double outroStart = quantizeCurrentPosition(QuantizeMode::PreviousBeat);
 
     // Make sure user is not trying to place outro start cue on or before
     // intro end cue or on or after outro end cue.
     double introStart = m_pIntroStartPosition->get();
     double introEnd = m_pIntroEndPosition->get();
     double outroEnd = m_pOutroEndPosition->get();
-    if (introStart != -1.0 && position <= introStart) {
+    if (introStart != -1.0 && outroStart <= introStart) {
         qWarning() << "Trying to place outro start cue on or before intro start cue.";
         return;
     }
-    if (introEnd != -1.0 && position <= introEnd) {
+    if (introEnd != -1.0 && outroStart <= introEnd) {
         qWarning() << "Trying to place outro start cue on or before intro end cue.";
         return;
     }
-    if (outroEnd != -1.0 && position >= outroEnd) {
+    if (outroEnd != -1.0 && outroStart >= outroEnd) {
         qWarning() << "Trying to place outro start cue on or after outro end cue.";
         return;
     }
@@ -1276,14 +1278,14 @@ void CueControl::outroStartSet(double v) {
     lock.unlock();
 
     if (pLoadedTrack) {
-        CuePosition cuePos(position, Cue::MANUAL);
+        double length = outroEnd != -1.0 ? outroEnd - outroStart : 0.0;
+        CuePosition position(outroStart, Cue::MANUAL);
         CuePointer pCue = pLoadedTrack->findCueByType(Cue::OUTRO);
         if (pCue) {
-            pCue->setCuePosition(cuePos);
+            pCue->setCuePositionAndLength(position, length);
         } else {
-            pCue = pLoadedTrack->createAndAddCue(Cue::OUTRO, cuePos);
+            pLoadedTrack->createAndAddCue(Cue::OUTRO, position, length);
         }
-        pCue->setLength(outroEnd != -1.0 ? outroEnd - position : 0.0);
     }
 }
 
@@ -1299,11 +1301,12 @@ void CueControl::outroStartClear(double v) {
 
     if (pLoadedTrack) {
         CuePointer pCue = pLoadedTrack->findCueByType(Cue::OUTRO);
-        if (outroEnd != -1.0) {
-            pCue->setPosition(-1.0);
-            pCue->setLength(outroEnd);
-        } else if (pCue) {
-            pLoadedTrack->removeCue(pCue);
+        if (pCue) {
+            if (outroEnd != -1.0) {
+                pCue->setCuePositionAndLength(CuePosition(-1.0, Cue::MANUAL), outroEnd);
+            } else if (pCue) {
+                pLoadedTrack->removeCue(pCue);
+            }
         }
     }
 }
@@ -1331,22 +1334,22 @@ void CueControl::outroEndSet(double v) {
 
     // Quantize cue point to nearest beat after current position.
     // Fall back to nearest beat before or current position.
-    double position = quantizeCurrentPosition(QuantizeMode::NextBeat);
+    double outroEnd = quantizeCurrentPosition(QuantizeMode::NextBeat);
 
     // Make sure user is not trying to place outro end cue on or before
     // other intro/outro cues.
     double introStart = m_pIntroStartPosition->get();
     double introEnd = m_pIntroEndPosition->get();
     double outroStart = m_pOutroStartPosition->get();
-    if (introStart != -1.0 && position <= introStart) {
+    if (introStart != -1.0 && outroEnd <= introStart) {
         qWarning() << "Trying to place outro end cue on or before intro start cue.";
         return;
     }
-    if (introEnd != -1.0 && position <= introEnd) {
+    if (introEnd != -1.0 && outroEnd <= introEnd) {
         qWarning() << "Trying to place outro end cue on or before intro end cue.";
         return;
     }
-    if (outroStart != -1.0 && position <= outroStart) {
+    if (outroStart != -1.0 && outroEnd <= outroStart) {
         qWarning() << "Trying to place outro end cue on or before outro start cue.";
         return;
     }
@@ -1355,23 +1358,23 @@ void CueControl::outroEndSet(double v) {
     lock.unlock();
 
     if (pLoadedTrack) {
-        double position;
         double length;
         if (outroStart != -1.0) {
-            position = outroStart;
-            length = position - outroStart;
+            // Both start and end position are available
+            length = outroEnd - outroStart;
+            outroEnd = outroStart;
         } else {
-            position = -1.0;
-            length = position;
+            // Only end position is available, start position is missing
+            length = outroEnd;
+            outroEnd = -1.0;
         }
-        CuePosition cuePos(position, Cue::MANUAL);
+        CuePosition position(outroEnd, Cue::MANUAL);
         CuePointer pCue = pLoadedTrack->findCueByType(Cue::OUTRO);
         if (pCue) {
-            pCue->setCuePosition(cuePos);
+            pCue->setCuePositionAndLength(position, length);
         } else {
-            pCue = pLoadedTrack->createAndAddCue(Cue::OUTRO, cuePos);
+            pLoadedTrack->createAndAddCue(Cue::OUTRO, position, length);
         }
-        pCue->setLength(length);
     }
 }
 
@@ -1387,11 +1390,12 @@ void CueControl::outroEndClear(double v) {
 
     if (pLoadedTrack) {
         CuePointer pCue = pLoadedTrack->findCueByType(Cue::OUTRO);
-        if (outroStart != -1.0) {
-            pCue->setPosition(outroStart);
-            pCue->setLength(0.0);
-        } else if (pCue) {
-            pLoadedTrack->removeCue(pCue);
+        if (pCue) {
+            if (outroStart != -1.0) {
+                pCue->setCuePositionAndLength(CuePosition(outroStart, Cue::MANUAL), 0.0);
+            } else if (pCue) {
+                pLoadedTrack->removeCue(pCue);
+            }
         }
     }
 }

@@ -178,13 +178,12 @@ TEST_F(AnalyzerSilenceTest, UpdateNonUserAdjustedCues) {
         Cue::INTRO,
         CuePosition(1000, Cue::AUTOMATIC) // Arbitrary value
     );
-    pIntroCue->setLength(0.0);
 
     CuePointer pOutroCue = pTrack->createAndAddCue(
         Cue::OUTRO,
-        CuePosition(-1.0, Cue::AUTOMATIC)
+        CuePosition(-1.0, Cue::AUTOMATIC),
+        9000 // Arbitrary value
     );
-    pOutroCue->setLength(9000);  // Arbitrary value
 
     // Fill the first half with silence
     for (int i = 0; i < halfTrackLength; i++) {
@@ -224,13 +223,12 @@ TEST_F(AnalyzerSilenceTest, RespectUserEdits) {
         Cue::INTRO,
         CuePosition(kManualIntroPosition, Cue::MANUAL)
     );
-    pIntroCue->setLength(0.0);
 
     CuePointer pOutroCue = pTrack->createAndAddCue(
         Cue::OUTRO,
-        CuePosition(-1.0, Cue::MANUAL)
+        CuePosition(-1.0, Cue::MANUAL),
+        kManualOutroPosition
     );
-    pOutroCue->setLength(kManualOutroPosition);
 
     // Fill the first half with silence
     for (int i = 0; i < nTrackSampleDataLength / 2; i++) {

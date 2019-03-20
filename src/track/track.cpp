@@ -765,12 +765,12 @@ CuePosition Track::getCuePoint() const {
     return pLoadCue->getCuePosition();
 }
 
-CuePointer Track::createAndAddCue(Cue::CueType type, CuePosition pos) {
+CuePointer Track::createAndAddCue(Cue::CueType type, CuePosition position, double length) {
     DEBUG_ASSERT(cueType != Cue::CueType::LOAD);
     QMutexLocker lock(&m_qMutex);
     CuePointer pCue(new Cue(m_record.getId()));
     pCue->setType(type);
-    pCue->setCuePosition(pos);
+    pCue->setCuePositionAndLength(position, length);
     connect(pCue.get(), SIGNAL(updated()), this, SLOT(slotCueUpdated()));
     m_cuePoints.push_back(pCue);
     refreshLoadCue();
