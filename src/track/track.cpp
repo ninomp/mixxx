@@ -766,7 +766,7 @@ CuePosition Track::getCuePoint() const {
 }
 
 CuePointer Track::createAndAddCue(Cue::CueType type, CuePosition position, double length) {
-    DEBUG_ASSERT(cueType != Cue::CueType::LOAD);
+    DEBUG_ASSERT(type != Cue::CueType::LOAD);
     QMutexLocker lock(&m_qMutex);
     CuePointer pCue(new Cue(m_record.getId()));
     pCue->setType(type);
