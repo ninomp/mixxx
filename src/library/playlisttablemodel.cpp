@@ -11,6 +11,8 @@ namespace {
 
 const QString kModelName = "playlist:";
 
+const QString kEtaTable = "tracks_eta";
+
 } // anonymous namespace
 
 PlaylistTableModel::PlaylistTableModel(QObject* parent,
@@ -20,6 +22,22 @@ PlaylistTableModel::PlaylistTableModel(QObject* parent,
         : TrackSetTableModel(parent, pTrackCollectionManager, settingsNamespace),
           m_iPlaylistId(kInvalidPlaylistId),
           m_keepHiddenTracks(keepHiddenTracks) {
+    QSqlQuery query(m_database);
+    QString queryString = QString(
+            "CREATE TEMPORARY VIEW IF NOT EXISTS %1 AS SELECT library.id, "
+            "(CASE WHEN outro.position > 0 THEN outro.position ELSE "
+            "outro.length END - intro.position) * 0.5 / samplerate AS eta "
+            "FROM library "
+            "LEFT JOIN cues intro ON library.id = intro.track_id AND "
+            "intro.type = 6 "
+            "LEFT JOIN cues outro ON library.id = outro.track_id AND "
+            "outro.type = 7 ")
+                                  .arg(kEtaTable);
+    query.prepare(queryString);
+    if (!query.exec()) {
+        LOG_FAILED_QUERY(query);
+    }
+
     connect(&m_pTrackCollectionManager->internalCollection()->getPlaylistDAO(),
             &PlaylistDAO::tracksAdded,
             this,
@@ -117,6 +135,9 @@ void PlaylistTableModel::initSortColumnMapping() {
     m_columnIndexBySortColumnId[static_cast<int>(
             TrackModel::SortColumnId::PlaylistDateTimeAdded)] =
             fieldIndex(ColumnCache::COLUMN_PLAYLISTTRACKSTABLE_DATETIMEADDED);
+    m_columnIndexBySortColumnId[static_cast<int>(
+            TrackModel::SortColumnId::PlaylistETA)] =
+            fieldIndex(ColumnCache::COLUMN_ETA);
 
     m_sortColumnIdByColumnIndex.clear();
     for (int i = static_cast<int>(TrackModel::SortColumnId::IdMin);
@@ -161,20 +182,24 @@ void PlaylistTableModel::selectPlaylist(int playlistId) {
 
     QStringList columns;
     columns << PLAYLISTTRACKSTABLE_TRACKID + " AS " + LIBRARYTABLE_ID
-            << PLAYLISTTRACKSTABLE_POSITION
-            << PLAYLISTTRACKSTABLE_DATETIMEADDED
+            << PLAYLISTTRACKSTABLE_POSITION << PLAYLISTTRACKSTABLE_DATETIMEADDED
             << "'' AS " + LIBRARYTABLE_PREVIEW
             // For sorting the cover art column we give LIBRARYTABLE_COVERART
             // the same value as the cover digest.
-            << LIBRARYTABLE_COVERART_DIGEST + " AS " + LIBRARYTABLE_COVERART;
+            << LIBRARYTABLE_COVERART_DIGEST + " AS " + LIBRARYTABLE_COVERART
+            << "SUM(" + PLAYLISTTRACKSTABLE_ETA + ") OVER(PARTITION BY " +
+                    PLAYLISTTRACKSTABLE_PLAYLISTID +
+                    " ORDER BY \"position\") AS eta";
 
     QString queryString = QString(
             "CREATE TEMPORARY VIEW IF NOT EXISTS %1 AS "
             "SELECT %2 FROM PlaylistTracks "
             "INNER JOIN library ON library.id = PlaylistTracks.track_id "
-            "WHERE PlaylistTracks.playlist_id = %3")
+            "LEFT JOIN %3 ON %3.id = PlaylistTracks.track_id "
+            "WHERE PlaylistTracks.playlist_id = %4")
                                   .arg(escaper.escapeString(playlistTableName),
                                           columns.join(","),
+                                          kEtaTable,
                                           QString::number(playlistId));
     query.prepare(queryString);
     if (!query.exec()) {
@@ -186,6 +211,7 @@ void PlaylistTableModel::selectPlaylist(int playlistId) {
     // columns[2] = PLAYLISTTRACKSTABLE_DATETIMEADDED from above
     columns[3] = LIBRARYTABLE_PREVIEW;
     columns[4] = LIBRARYTABLE_COVERART;
+    columns[5] = PLAYLISTTRACKSTABLE_ETA;
     setTable(playlistTableName,
             LIBRARYTABLE_ID,
             columns,

@@ -65,6 +65,8 @@ class ColumnCache : public QObject {
 
         COLUMN_REKORDBOX_ANALYZE_PATH,
 
+        COLUMN_ETA,
+
         // NUM_COLUMNS should always be the last item.
         NUM_COLUMNS
     };

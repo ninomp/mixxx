@@ -23,6 +23,8 @@ const QString PLAYLISTTRACKSTABLE_POSITION = QStringLiteral("position");
 const QString PLAYLISTTRACKSTABLE_PLAYLISTID = QStringLiteral("playlist_id");
 const QString PLAYLISTTRACKSTABLE_DATETIMEADDED = QStringLiteral("pl_datetime_added");
 
+const QString PLAYLISTTRACKSTABLE_ETA = QStringLiteral("eta");
+
 #define AUTODJ_TABLE "Auto DJ"
 
 class AutoDJProcessor;

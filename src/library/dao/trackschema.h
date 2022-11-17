@@ -55,6 +55,7 @@ const QString TRACKLOCATIONSTABLE_DIRECTORY = QStringLiteral("directory");
 const QString TRACKLOCATIONSTABLE_FILESIZE = QStringLiteral("filesize");
 const QString TRACKLOCATIONSTABLE_FSDELETED = QStringLiteral("fs_deleted");
 const QString TRACKLOCATIONSTABLE_NEEDSVERIFICATION = QStringLiteral("needs_verification");
+// const QString TRACKLOCATIONSTABLE_ETA = QStringLiteral("eta");
 
 const QString REKORDBOX_ANALYZE_PATH = "analyze_path";
 
