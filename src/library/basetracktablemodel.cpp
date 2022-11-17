@@ -64,6 +64,8 @@ const QStringList kDefaultTableColumns = {
         LIBRARYTABLE_TITLE,
         LIBRARYTABLE_TRACKNUMBER,
         LIBRARYTABLE_YEAR,
+        PLAYLISTTRACKSTABLE_ETA,
+        // TRACKLOCATIONSTABLE_ETA,
 };
 
 inline QSqlDatabase cloneDatabase(
@@ -831,6 +833,14 @@ QVariant BaseTrackTableModel::roleValue(
                 return dt;
             }
             return dt.date();
+        }
+        case ColumnCache::COLUMN_ETA: {
+            if (rawValue.canConvert<double>()) {
+                // rawValue.value<mixxx::Duration>()
+                double seconds = rawValue.toDouble();
+                return mixxx::Duration::formatTime(seconds);
+            }
+            return rawValue;
         }
         case ColumnCache::COLUMN_LIBRARYTABLE_BPM: {
             mixxx::Bpm bpm;

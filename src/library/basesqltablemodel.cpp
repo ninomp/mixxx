@@ -60,6 +60,7 @@ void BaseSqlTableModel::initHeaderProperties() {
     setHeaderProperties(ColumnCache::COLUMN_PLAYLISTTRACKSTABLE_DATETIMEADDED,
             tr("Timestamp"),
             80);
+    setHeaderProperties(ColumnCache::COLUMN_ETA, tr("ETA"), 80);
 }
 
 void BaseSqlTableModel::initSortColumnMapping() {
@@ -145,6 +146,9 @@ void BaseSqlTableModel::initSortColumnMapping() {
     m_columnIndexBySortColumnId[static_cast<int>(
             TrackModel::SortColumnId::PlaylistDateTimeAdded)] =
             fieldIndex(ColumnCache::COLUMN_PLAYLISTTRACKSTABLE_DATETIMEADDED);
+    m_columnIndexBySortColumnId[static_cast<int>(
+            TrackModel::SortColumnId::PlaylistETA)] =
+            fieldIndex(ColumnCache::COLUMN_ETA);
 
     m_sortColumnIdByColumnIndex.clear();
     for (int i = static_cast<int>(TrackModel::SortColumnId::IdMin);
@@ -650,6 +654,12 @@ QVariant BaseSqlTableModel::rawValue(
         if (column == fieldIndex(ColumnCache::COLUMN_LIBRARYTABLE_PREVIEW)) {
             return previewDeckTrackId() == trackId;
         }
+
+        /*
+        if (column == fieldIndex(ColumnCache::COLUMN_ETA)) {
+            return 0;
+        }
+        */
 
         const QVector<QVariant>& columns = rowInfo.metadata;
         if (sDebug) {
