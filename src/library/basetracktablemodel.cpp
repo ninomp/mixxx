@@ -1177,7 +1177,7 @@ void BaseTrackTableModel::slotRefreshCoverRows(
 }
 
 void BaseTrackTableModel::slotOverviewReady(int row) {
-    const int column = fieldIndex(LIBRARYTABLE_COVERART);
+    const int column = fieldIndex(LIBRARYTABLE_WAVESUMMARYHEX);
     VERIFY_OR_DEBUG_ASSERT(column >= 0) {
         return;
     }
@@ -1186,7 +1186,7 @@ void BaseTrackTableModel::slotOverviewReady(int row) {
 }
 
 void BaseTrackTableModel::slotOverviewChanged(TrackId trackId) {
-    const int column = fieldIndex(LIBRARYTABLE_COVERART);
+    const int column = fieldIndex(LIBRARYTABLE_WAVESUMMARYHEX);
     VERIFY_OR_DEBUG_ASSERT(column >= 0) {
         return;
     }
